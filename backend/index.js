@@ -1,1 +1,0 @@
-console.log('Servidor backend iniciado com MongoDB Atlas.');
