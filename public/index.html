@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Villa Borghese — Delivery</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #ECE5DD;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 480px;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #ECE5DD;
+    }
+
+    /* ─── Header ─── */
+    .header {
+      background: #075E54;
+      color: white;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      flex-shrink: 0;
+    }
+    .avatar {
+      width: 42px; height: 42px;
+      background: #25D366;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .header-info h2 { font-size: 16px; font-weight: 600; }
+    .header-info p  { font-size: 12px; color: #B2DFDB; margin-top: 1px; }
+
+    /* ─── Mensagens ─── */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .messages::-webkit-scrollbar { width: 5px; }
+    .messages::-webkit-scrollbar-thumb { background: #bbb; border-radius: 4px; }
+
+    .notice {
+      text-align: center;
+      background: rgba(0,0,0,0.07);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 6px;
+      align-self: center;
+    }
+
+    .message {
+      max-width: 78%;
+      padding: 7px 12px 4px;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.45;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+      position: relative;
+    }
+    .message.user {
+      background: #DCF8C6;
+      align-self: flex-end;
+      border-radius: 8px 8px 0 8px;
+    }
+    .message.bot {
+      background: #fff;
+      align-self: flex-start;
+      border-radius: 8px 8px 8px 0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .message .time {
+      font-size: 11px;
+      color: #999;
+      text-align: right;
+      margin-top: 3px;
+    }
+
+    /* ─── Indicador digitando ─── */
+    .typing-indicator {
+      background: #fff;
+      padding: 10px 14px;
+      border-radius: 8px 8px 8px 0;
+      align-self: flex-start;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .typing-indicator span {
+      display: inline-block;
+      width: 8px; height: 8px;
+      background: #aaa;
+      border-radius: 50%;
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30%           { transform: translateY(-6px); }
+    }
+
+    /* ─── Input ─── */
+    .input-area {
+      background: #F0F0F0;
+      padding: 8px 10px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .input-area input {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 24px;
+      font-size: 14px;
+      outline: none;
+      background: white;
+    }
+    .input-area button {
+      width: 44px; height: 44px;
+      background: #25D366;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .input-area button:hover   { background: #128C7E; }
+    .input-area button:disabled { background: #ccc; cursor: not-allowed; }
+
+    .btn-new-chat {
+      background: none;
+      border: none;
+      color: #B2DFDB;
+      font-size: 22px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 50%;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .btn-new-chat:hover { background: rgba(255,255,255,0.15); }
+  </style>
+</head>
+<body>
+<div class="chat-container">
+
+  <div class="header">
+    <div class="avatar">🛒</div>
+    <div class="header-info">
+      <h2>Maithe do Villa 🛒</h2>
+      <p id="status">Villa Borghese Empório • online</p>
+    </div>
+    <button class="btn-new-chat" onclick="novaConversa()" title="Nova conversa">✏️</button>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="notice">🔒 Modo de teste local — simulação do WhatsApp</div>
+  </div>
+
+  <div class="input-area">
+    <input id="input" type="text" placeholder="Digite uma mensagem..." autocomplete="off" />
+    <button id="sendBtn" onclick="sendMessage()" title="Enviar">
+      &#9658;
+    </button>
+  </div>
+
+</div>
+
+<script>
+  const messagesEl = document.getElementById('messages');
+  const inputEl    = document.getElementById('input');
+  const sendBtn    = document.getElementById('sendBtn');
+  const statusEl   = document.getElementById('status');
+
+  // Inicia conversa buscando menu do servidor
+  window.addEventListener('load', async () => {
+    await fetch('/nova-conversa', { method: 'POST' });
+    setTimeout(async () => {
+      showTyping();
+      try {
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mensagem: 'oi' }),
+        });
+        const data = await res.json();
+        hideTyping();
+        appendMessage('bot', data.resposta || '');
+      } catch {
+        hideTyping();
+        appendMessage('bot', '❌ Erro ao conectar ao servidor.');
+      }
+    }, 500);
+  });
+
+  function getTime() {
+    return new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function escapeHtml(text) {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+  }
+
+  function appendMessage(type, text) {
+    const div = document.createElement('div');
+    div.className = `message ${type}`;
+    div.innerHTML = `${escapeHtml(text)}<div class="time">${getTime()}</div>`;
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function showTyping() {
+    const div = document.createElement('div');
+    div.id = 'typing';
+    div.className = 'typing-indicator';
+    div.innerHTML = '<span></span><span></span><span></span>';
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function hideTyping() {
+    const el = document.getElementById('typing');
+    if (el) el.remove();
+  }
+
+  async function sendMessage() {
+    const text = inputEl.value.trim();
+    if (!text || sendBtn.disabled) return;
+
+    appendMessage('user', text);
+    inputEl.value = '';
+    sendBtn.disabled = true;
+    statusEl.textContent = 'digitando...';
+    showTyping();
+
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mensagem: text }),
+      });
+      const data = await res.json();
+      hideTyping();
+      appendMessage('bot', data.resposta || data.error || 'Erro desconhecido.');
+    } catch {
+      hideTyping();
+      appendMessage('bot', '❌ Não consegui conectar ao servidor. Verifique se o bot está rodando.');
+    } finally {
+      sendBtn.disabled = false;
+      statusEl.textContent = 'online';
+      inputEl.focus();
+    }
+  }
+
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  async function novaConversa() {
+    await fetch('/nova-conversa', { method: 'POST' });
+    messagesEl.innerHTML = '<div class="notice">🔒 Modo de teste local — simulação do WhatsApp</div>';
+    showTyping();
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mensagem: 'oi' }),
+      });
+      const data = await res.json();
+      hideTyping();
+      appendMessage('bot', data.resposta || '');
+    } catch {
+      hideTyping();
+    }
+    inputEl.focus();
+  }
+</script>
+</body>
+</html>
