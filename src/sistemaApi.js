@@ -21,10 +21,19 @@ async function getProdutos(categoria = null) {
   }
 }
 
-// ─── Busca produto por nome ou código ───
+// ─── Verifica se o termo é um código de barras EAN (8–13 dígitos) ───
+function pareceCodBarras(termo) {
+  return /^\d{8,13}$/.test(termo.trim());
+}
+
+// ─── Busca produto por nome, marca, descrição, peso (kg/g) ou EAN13 ───
 async function buscarProduto(termo) {
   try {
-    const res = await api.get('/produtos/buscar', { params: { q: termo } });
+    const params = pareceCodBarras(termo.trim())
+      ? { ean: termo.trim() }                  // busca direta por código de barras
+      : { q: termo, campos: 'nome,marca,descricao,categoria,ean' }; // busca ampla
+
+    const res = await api.get('/produtos/buscar', { params });
     return res.data;
   } catch (err) {
     console.error('Erro ao buscar produto:', err.message);

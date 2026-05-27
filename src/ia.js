@@ -8,11 +8,11 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const tools = [
   {
     name: 'buscar_produtos',
-    description: 'Busca produtos no estoque da mercearia por nome, categoria ou termo. Use para verificar o que tem disponível.',
+    description: 'Busca produtos no estoque por nome, marca, descrição, peso (ex: 500g, 1kg), volume (ex: 900ml, 2L) ou código de barras EAN13. Use para verificar o que tem disponível.',
     input_schema: {
       type: 'object',
       properties: {
-        termo: { type: 'string', description: 'Nome do produto ou categoria (ex: arroz, laticínios, bebidas)' },
+        termo: { type: 'string', description: 'Nome, marca, categoria, peso/volume (ex: "manteiga Aviação 200g", "OMO 1kg", "laticínios") ou código EAN13 (ex: "7891150062108")' },
       },
       required: ['termo'],
     },
