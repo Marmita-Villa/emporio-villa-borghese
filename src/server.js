@@ -1,8 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { handleIncomingMessage } = require('./whatsapp');
-const { getOrCreateSession, clearSession } = require('./session');
+const { handleIncomingMessage, enviarMensagem } = require('./whatsapp');
+const { getOrCreateSession, clearSession, verificarSessoesExpiradas } = require('./session');
 const { processarMensagem } = require('./atendimento');
 
 const app = express();
@@ -85,6 +85,22 @@ app.post('/nova-conversa', (req, res) => {
 
 // ─── Interface web de teste ───
 app.use(express.static(path.join(__dirname, '../public')));
+
+// ─── Monitor de sessões inativas (verifica a cada 2 minutos) ───
+setInterval(async () => {
+  const expiradas = verificarSessoesExpiradas();
+  for (const { phone } of expiradas) {
+    console.log(`⏰ Sessão expirada por inatividade: ${phone}`);
+    try {
+      await enviarMensagem(
+        phone,
+        '👋 Sua conversa foi encerrada por inatividade.\n\nSe precisar de algo é só mandar uma mensagem! 😊'
+      );
+    } catch (err) {
+      console.error(`Erro ao notificar encerramento para ${phone}:`, err.message);
+    }
+  }
+}, 2 * 60 * 1000); // a cada 2 minutos
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Bot rodando na porta ${PORT}`));

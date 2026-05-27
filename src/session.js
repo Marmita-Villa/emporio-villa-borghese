@@ -2,7 +2,7 @@
 // Em produção, use Redis para persistir entre reinicializações
 const sessions = new Map();
 
-const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutos de inatividade encerra sessão
+const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos de inatividade encerra sessão
 
 function getSession(phone) {
   const session = sessions.get(phone);
@@ -39,6 +39,24 @@ function clearSession(phone) {
   sessions.delete(phone);
 }
 
+// Retorna sessões expiradas e as remove — chamado pelo monitor em server.js
+function verificarSessoesExpiradas() {
+  const expiradas = [];
+  const agora = Date.now();
+
+  for (const [phone, session] of sessions.entries()) {
+    if (agora - session.lastActivity > SESSION_TIMEOUT_MS) {
+      // Só notifica sessões reais que já interagiram (ignora teste_local e menu inicial)
+      if (phone !== 'teste_local' && session.step !== 'menu') {
+        expiradas.push({ phone, step: session.step });
+      }
+      sessions.delete(phone);
+    }
+  }
+
+  return expiradas;
+}
+
 function addMessageToSession(phone, role, content) {
   const session = getOrCreateSession(phone);
   session.messages.push({ role, content });
@@ -50,4 +68,4 @@ function addMessageToSession(phone, role, content) {
   return session;
 }
 
-module.exports = { getOrCreateSession, addMessageToSession, clearSession };
+module.exports = { getOrCreateSession, addMessageToSession, clearSession, verificarSessoesExpiradas };
