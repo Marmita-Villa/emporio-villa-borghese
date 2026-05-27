@@ -38,11 +38,17 @@ async function handleIncomingMessage(phone, texto) {
   await enviarIndicadorDigitando(phone);
 
   try {
-    // Processa com a IA (que pode consultar estoque e criar pedido)
     const resposta = await processarMensagem(session, texto);
 
-    // Envia resposta ao cliente
-    await enviarMensagem(phone, resposta);
+    // Suporte a múltiplas mensagens (array) ou mensagem única (string)
+    if (Array.isArray(resposta)) {
+      for (const msg of resposta) {
+        await enviarMensagem(phone, msg);
+        await new Promise(r => setTimeout(r, 800)); // pausa entre mensagens
+      }
+    } else {
+      await enviarMensagem(phone, resposta);
+    }
   } catch (err) {
     console.error('Erro no atendimento:', err);
     await enviarMensagem(

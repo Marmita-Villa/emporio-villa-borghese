@@ -70,7 +70,9 @@ app.post('/chat', async (req, res) => {
   const session = getOrCreateSession(telefone);
   try {
     const resposta = await processarMensagem(session, mensagem);
-    res.json({ resposta });
+    // Se retornar array (múltiplas mensagens), junta com separador visual
+    const texto = Array.isArray(resposta) ? resposta.join('\n\n') : resposta;
+    res.json({ resposta: texto });
   } catch (err) {
     console.error('Erro no chat de teste:', err.message);
     res.status(500).json({ error: err.message });

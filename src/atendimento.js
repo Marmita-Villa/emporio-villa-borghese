@@ -9,6 +9,35 @@ Como prefere ser atendido?
 
 Digite *1* ou *2*`;
 
+const FORM_MSG = `Para prosseguir seu atendimento por WhatsApp, preencha os campos abaixo e aguarde que um de nossos colaboradores irá lhe atender:
+
+*Nome Completo:*
+*CPF:*
+*Telefone:*
+*Endereço:*
+*Forma de pagamento:*
+*Pedido:*
+
+_Exemplo:_
+1 un molho de tomate tradicional sachet Pomarola
+1 un leite integral qualquer marca
+1 un manteiga Aviação com sal tablete
+6 un batata lavada ou 1 kg
+
+*Observações:*
+- Especificar a quantidade, marca e produto;
+- Antes de enviar o seu pedido, verifique se todos os itens estão de acordo com a sua preferência;
+Você aceita marcas similares? ( ) sim ou ( ) não.
+Agradecemos seu contato! 😊`;
+
+const BOAS_VINDAS_MAITHE = `Olá! Seja bem-vindo ao delivery do *Empório Villa Borghese*, eu sou a *Maithe*! 😊
+
+Estamos com mais um canal de atendimento para realizar suas compras, através do nosso site www.emporiovillaborghese.com.br`;
+
+const BOAS_VINDAS_HUMANO = `Olá! Seja bem-vindo ao delivery do *Empório Villa Borghese*! 😊
+
+Estamos com mais um canal de atendimento para realizar suas compras, através do nosso site www.emporiovillaborghese.com.br`;
+
 // ─── Roteador principal de atendimento ───
 async function processarMensagem(session, texto) {
 
@@ -26,30 +55,32 @@ async function processarMensagem(session, texto) {
 
     if (escolheuVirtual) {
       session.step = 'ai';
-      // Inicia a conversa com a Maithe
-      return await processarComIA(session, '__inicio__');
+      // Retorna array: duas mensagens separadas
+      return [BOAS_VINDAS_MAITHE, FORM_MSG];
     }
 
     if (escolheuHumano) {
       session.step = 'humano';
       console.log(`🙋 Cliente ${session.phone} solicitou atendente humano`);
-      return `Perfeito! 👤 Em breve um de nossos atendentes vai te chamar aqui no chat.\n\nAguarda um momento! 😊\n\n_Se mudar de ideia, manda *1* para falar com a Maithe agora._`;
+      return [BOAS_VINDAS_HUMANO, FORM_MSG];
     }
 
     // Opção inválida — repete o menu
     return `Não entendi 😅 Por favor, escolha:\n\n1️⃣ *Maithe* — Atendente virtual\n2️⃣ *Atendente humano*\n\nDigite *1* ou *2*`;
   }
 
-  // ── Modo humano: permite voltar para a IA ──
+  // ── Modo humano: aguarda formulário preenchido ──
   if (session.step === 'humano') {
     if (texto.trim() === '1') {
       session.step = 'ai';
-      return await processarComIA(session, '__inicio__');
+      return [BOAS_VINDAS_MAITHE, FORM_MSG];
     }
-    return `Oi! 😊 Um atendente humano já vai te chamar aqui.\n\nSe quiser falar com a Maithe agora, manda *1*.`;
+    // Formulário recebido — notifica equipe via log
+    console.log(`📋 Formulário recebido de ${session.phone}:\n${texto}`);
+    return `Recebemos seu pedido! ✅\n\nUm de nossos atendentes vai te chamar em breve para confirmar tudo. 😊\n\nSe mudar de ideia, manda *1* para falar com a Maithe agora.`;
   }
 
-  // ── Modo IA: fluxo normal ──
+  // ── Modo IA: Maithe processa o formulário e os pedidos ──
   return await processarComIA(session, texto);
 }
 
