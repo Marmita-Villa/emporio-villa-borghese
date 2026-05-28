@@ -117,7 +117,7 @@ async function buscarCliente(identificador) {
       params = { nome: identificador };          // Nome: texto livre
     }
 
-    const res = await api.get('/clientes/buscar', { params });
+    const res = await api.get('/clientes/buscar', { params: { ...params, incluir_historico: true } });
     return res.data || null;
   } catch (err) {
     if (err.response?.status === 404) return null;

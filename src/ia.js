@@ -93,20 +93,44 @@ async function executarFerramenta(nomeFerramenta, inputs, session) {
     if (!cliente) {
       return `Cliente não encontrado no cadastro. Tratar como novo cliente.`;
     }
-    // Salva nome na sessão para usar no pedido
+    // Salva nome na sessão para uso no pedido
     session.customerName = cliente.nome;
-    const vezes = cliente.pedidos_anteriores;
-    const ultimoPedido = cliente.ultimo_pedido
-      ? new Date(cliente.ultimo_pedido).toLocaleDateString('pt-BR')
-      : null;
-    return `Cliente encontrado! ✅
+    const vezes = cliente.total_pedidos || 0;
+    const perfil = vezes >= 10 ? 'fiel e muito frequente' : vezes >= 3 ? 'recorrente' : vezes > 0 ? 'já comprou antes' : 'novo';
+
+    let resposta = `Cliente encontrado! ✅
 Nome: ${cliente.nome}
 CPF: ${cliente.cpf}
 Telefone: ${cliente.telefone}
 Endereço cadastrado: ${cliente.endereco}
 Pagamento preferido: ${cliente.forma_pagamento_preferida}
-Pedidos anteriores: ${vezes} pedido(s)${ultimoPedido ? ` | Último pedido: ${ultimoPedido}` : ''}
-Trate como cliente ${vezes > 5 ? 'fiel e frequente' : vezes > 0 ? 'recorrente' : 'novo'} e cumprimente pelo nome com carinho.`;
+Total de pedidos: ${vezes} | Perfil: ${perfil}`;
+
+    // Último pedido
+    if (cliente.ultimo_pedido) {
+      const data = new Date(cliente.ultimo_pedido.data).toLocaleDateString('pt-BR');
+      const itens = cliente.ultimo_pedido.itens.map(i => `${i.quantidade}x ${i.nome}`).join(', ');
+      resposta += `\n\nÚltimo pedido (${data} - ${cliente.ultimo_pedido.numero}): ${itens}`;
+      resposta += `\n→ Sugerir repetir o último pedido se fizer sentido`;
+    }
+
+    // Favoritos
+    if (cliente.favoritos && cliente.favoritos.length > 0) {
+      const favs = cliente.favoritos.slice(0, 3).map(f => `${f.nome} (${f.total}x)`).join(', ');
+      resposta += `\n\nItens que mais pede: ${favs}`;
+      resposta += `\n→ Se não estiverem no pedido atual, sugerir com naturalidade`;
+    }
+
+    // Favoritos em oferta
+    if (cliente.favoritos_em_oferta && cliente.favoritos_em_oferta.length > 0) {
+      const ofertas = cliente.favoritos_em_oferta.map(f =>
+        `${f.nome} (de R$ ${f.preco_normal.toFixed(2)} por R$ ${f.preco_oferta.toFixed(2)} — ${f.descricao_oferta})`
+      ).join('; ');
+      resposta += `\n\n⭐ ITENS FAVORITOS EM OFERTA AGORA: ${ofertas}`;
+      resposta += `\n→ Mencionar com entusiasmo! Cliente vai adorar saber.`;
+    }
+
+    return resposta;
   }
 
   if (nomeFerramenta === 'buscar_produtos') {
@@ -171,10 +195,14 @@ DATA E HORA ATUAL: ${agora}
 O cliente já foi recebido com boas-vindas e um formulário. A primeira mensagem que você vai receber é o formulário preenchido com: Nome Completo, CPF, Telefone, Endereço, Forma de pagamento, Pedido e se aceita marcas similares.
 
 AO RECEBER O FORMULÁRIO:
-1. Use SEMPRE a ferramenta buscar_cliente com o CPF ou telefone informado
-2. Se encontrar cadastro: cumprimente pelo nome com carinho, mencione que já conhece o cliente (ex: "Que saudade! Já é seu 12º pedido aqui no Villa!") e confirme ou use o endereço cadastrado
+1. Use SEMPRE a ferramenta buscar_cliente com CPF, telefone e nome juntos
+2. Se encontrar cadastro:
+   - Cumprimente pelo nome com carinho e mencione o número de pedidos ("Já é seu 12º pedido!")
+   - Se tiver último pedido: pergunte se quer repetir ("Da última vez você levou X e Y — quer repetir?")
+   - Se tiver itens favoritos em oferta: avise com entusiasmo ("Boa notícia! Seu [item favorito] está em promoção hoje!")
+   - Se o pedido atual não incluir algum item que sempre pede: sugira com naturalidade ("Notei que você costuma pedir [item] — quer incluir?")
 3. Se não encontrar: cumprimente pelo nome normalmente e trate como novo cliente
-4. Após identificar o cliente, extraia os itens do pedido, verifique o estoque e processe normalmente
+4. Após o papo de boas-vindas, processe os itens do pedido normalmente
 
 NOSSAS UNIDADES E HORÁRIOS:
 • Rua Mato Grosso, 404, Santos/SP — Seg. a Sáb. das 8h às 21h | Dom. das 8h às 14h

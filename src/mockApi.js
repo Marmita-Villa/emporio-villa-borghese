@@ -1,6 +1,30 @@
 // ─── Dados fictícios para teste local (sem API real) ───
 
-// ─── Base de clientes mock ───
+// ─── Produtos (com campo oferta) ───
+const produtos = [
+  { id: '001', nome: 'Arroz Tio João 5kg',        marca: 'Tio João',   descricao: 'Arroz branco tipo 1 pacote 5kg',         preco: 28.90, estoque: 15, categoria: 'grãos',      ean: '7896048007500', oferta: true,  preco_oferta: 24.90, descricao_oferta: '🔥 Promoção da semana!' },
+  { id: '002', nome: 'Feijão Carioca Camil 1kg',  marca: 'Camil',      descricao: 'Feijão carioca tipo 1 pacote 1kg',        preco:  8.50, estoque: 20, categoria: 'grãos',      ean: '7896006716018', oferta: false },
+  { id: '003', nome: 'Feijão Preto Camil 1kg',    marca: 'Camil',      descricao: 'Feijão preto tipo 1 pacote 1kg',          preco:  9.20, estoque: 12, categoria: 'grãos',      ean: '7896006716025', oferta: false },
+  { id: '004', nome: 'Óleo de Soja Soya 900ml',   marca: 'Soya',       descricao: 'Óleo de soja refinado garrafa 900ml',     preco:  7.90, estoque: 30, categoria: 'óleos',      ean: '7891107101621', oferta: false },
+  { id: '005', nome: 'Açúcar Cristal União 1kg',  marca: 'União',      descricao: 'Açúcar cristal pacote 1kg',               preco:  4.50, estoque: 25, categoria: 'mercearia',  ean: '7891910000181', oferta: false },
+  { id: '006', nome: 'Macarrão Espaguete Barilla 500g', marca: 'Barilla', descricao: 'Macarrão espaguete nº5 pacote 500g',  preco:  3.90, estoque: 40, categoria: 'massas',     ean: '8076800195057', oferta: false },
+  { id: '007', nome: 'Macarrão Parafuso Barilla 500g',  marca: 'Barilla', descricao: 'Macarrão parafuso fusilli pacote 500g', preco: 3.90, estoque: 35, categoria: 'massas',    ean: '8076800195064', oferta: false },
+  { id: '008', nome: 'Leite Integral Parmalat 1L', marca: 'Parmalat',  descricao: 'Leite UHT integral caixa 1 litro',        preco:  5.20, estoque: 50, categoria: 'laticínios', ean: '7891097100047', oferta: true,  preco_oferta: 4.50, descricao_oferta: '🥛 Leve 6 por R$ 27,00!' },
+  { id: '009', nome: 'Leite Desnatado Parmalat 1L', marca: 'Parmalat', descricao: 'Leite UHT desnatado caixa 1 litro',       preco:  5.50, estoque: 20, categoria: 'laticínios', ean: '7891097100054', oferta: false },
+  { id: '010', nome: 'Manteiga Aviação 200g',      marca: 'Aviação',   descricao: 'Manteiga com sal tablete 200g',           preco: 12.90, estoque: 15, categoria: 'laticínios', ean: '7891097100078', oferta: false },
+  { id: '011', nome: 'Queijo Mussarela Faixa Azul 500g', marca: 'Faixa Azul', descricao: 'Queijo mussarela fatiado 500g',   preco: 24.90, estoque:  8, categoria: 'laticínios', ean: '7891097100092', oferta: false },
+  { id: '012', nome: 'Refrigerante Coca-Cola 2L',  marca: 'Coca-Cola', descricao: 'Refrigerante cola garrafa 2 litros',      preco:  9.90, estoque: 24, categoria: 'bebidas',    ean: '7894900011517', oferta: true,  preco_oferta: 8.50, descricao_oferta: '🥤 Oferta relâmpago!' },
+  { id: '013', nome: 'Refrigerante Guaraná Antarctica 2L', marca: 'Antarctica', descricao: 'Refrigerante guaraná garrafa 2L', preco: 7.90, estoque: 18, categoria: 'bebidas',   ean: '7891991010051', oferta: false },
+  { id: '014', nome: 'Água Mineral Crystal 1,5L',  marca: 'Crystal',   descricao: 'Água mineral sem gás garrafa 1,5 litro',  preco:  2.50, estoque: 60, categoria: 'bebidas',    ean: '7894900700015', oferta: false },
+  { id: '015', nome: 'Cerveja Skol Lata 350ml',    marca: 'Skol',      descricao: 'Cerveja pilsen lata 350ml',               preco:  4.50, estoque: 48, categoria: 'bebidas',    ean: '7891991000052', oferta: false },
+  { id: '016', nome: 'Pão de Forma Wickbold 500g', marca: 'Wickbold',  descricao: 'Pão de forma tradicional fatiado 500g',   preco:  7.90, estoque: 10, categoria: 'padaria',    ean: '7896071012108', oferta: false },
+  { id: '017', nome: 'Biscoito Maizena Piraquê 400g', marca: 'Piraquê', descricao: 'Biscoito maizena pacote 400g',          preco:  5.90, estoque:  0, categoria: 'biscoitos',  ean: '7896024400012', oferta: false }, // sem estoque
+  { id: '018', nome: 'Biscoito Recheado Oreo 130g', marca: 'Oreo',     descricao: 'Biscoito recheado chocolate pacote 130g', preco:  3.50, estoque: 30, categoria: 'biscoitos',  ean: '7622300441937', oferta: false },
+  { id: '019', nome: 'Sabão em Pó OMO 1kg',        marca: 'OMO',       descricao: 'Sabão em pó multiação pacote 1kg',        preco: 14.90, estoque: 20, categoria: 'limpeza',    ean: '7891150062108', oferta: true,  preco_oferta: 12.90, descricao_oferta: '🧺 Desconto especial!' },
+  { id: '020', nome: 'Detergente Ypê 500ml',       marca: 'Ypê',       descricao: 'Detergente neutro frasco 500ml',          preco:  2.90, estoque: 35, categoria: 'limpeza',    ean: '7896098900244', oferta: false },
+];
+
+// ─── Base de clientes com histórico de pedidos ───
 const clientes = [
   {
     id: 'CLI001',
@@ -10,8 +34,25 @@ const clientes = [
     email: 'ana@email.com',
     endereco: 'Rua das Flores, 123, Boqueirão, Santos/SP',
     forma_pagamento_preferida: 'Pix',
-    pedidos_anteriores: 12,
-    ultimo_pedido: '2025-05-20',
+    historico_pedidos: [
+      { data: '2025-05-20', numero: 'PED-135', itens: [
+        { id: '001', nome: 'Arroz Tio João 5kg', quantidade: 1 },
+        { id: '008', nome: 'Leite Integral Parmalat 1L', quantidade: 6 },
+        { id: '010', nome: 'Manteiga Aviação 200g', quantidade: 1 },
+        { id: '020', nome: 'Detergente Ypê 500ml', quantidade: 2 },
+      ]},
+      { data: '2025-05-05', numero: 'PED-121', itens: [
+        { id: '001', nome: 'Arroz Tio João 5kg', quantidade: 1 },
+        { id: '002', nome: 'Feijão Carioca Camil 1kg', quantidade: 2 },
+        { id: '008', nome: 'Leite Integral Parmalat 1L', quantidade: 6 },
+        { id: '019', nome: 'Sabão em Pó OMO 1kg', quantidade: 1 },
+      ]},
+      { data: '2025-04-18', numero: 'PED-108', itens: [
+        { id: '001', nome: 'Arroz Tio João 5kg', quantidade: 2 },
+        { id: '008', nome: 'Leite Integral Parmalat 1L', quantidade: 12 },
+        { id: '010', nome: 'Manteiga Aviação 200g', quantidade: 2 },
+      ]},
+    ],
   },
   {
     id: 'CLI002',
@@ -21,8 +62,13 @@ const clientes = [
     email: 'carlos@email.com',
     endereco: 'Av. Ana Costa, 456, Vila Belmiro, Santos/SP',
     forma_pagamento_preferida: 'Cartão de crédito',
-    pedidos_anteriores: 3,
-    ultimo_pedido: '2025-04-15',
+    historico_pedidos: [
+      { data: '2025-04-15', numero: 'PED-098', itens: [
+        { id: '012', nome: 'Refrigerante Coca-Cola 2L', quantidade: 3 },
+        { id: '015', nome: 'Cerveja Skol Lata 350ml', quantidade: 12 },
+        { id: '018', nome: 'Biscoito Recheado Oreo 130g', quantidade: 4 },
+      ]},
+    ],
   },
   {
     id: 'CLI003',
@@ -32,33 +78,79 @@ const clientes = [
     email: 'matheus@emporiovillaborghese.com.br',
     endereco: 'Rua Mato Grosso, 404, Santos/SP',
     forma_pagamento_preferida: 'Pix',
-    pedidos_anteriores: 47,
-    ultimo_pedido: '2025-05-27',
+    historico_pedidos: [
+      { data: '2025-05-27', numero: 'PED-147', itens: [
+        { id: '001', nome: 'Arroz Tio João 5kg', quantidade: 2 },
+        { id: '008', nome: 'Leite Integral Parmalat 1L', quantidade: 6 },
+        { id: '010', nome: 'Manteiga Aviação 200g', quantidade: 1 },
+        { id: '019', nome: 'Sabão em Pó OMO 1kg', quantidade: 2 },
+      ]},
+      { data: '2025-05-15', numero: 'PED-139', itens: [
+        { id: '001', nome: 'Arroz Tio João 5kg', quantidade: 2 },
+        { id: '002', nome: 'Feijão Carioca Camil 1kg', quantidade: 3 },
+        { id: '008', nome: 'Leite Integral Parmalat 1L', quantidade: 6 },
+        { id: '012', nome: 'Refrigerante Coca-Cola 2L', quantidade: 2 },
+      ]},
+      { data: '2025-05-01', numero: 'PED-128', itens: [
+        { id: '001', nome: 'Arroz Tio João 5kg', quantidade: 2 },
+        { id: '008', nome: 'Leite Integral Parmalat 1L', quantidade: 12 },
+        { id: '019', nome: 'Sabão em Pó OMO 1kg', quantidade: 2 },
+        { id: '010', nome: 'Manteiga Aviação 200g', quantidade: 2 },
+      ]},
+    ],
   },
 ];
 
-const produtos = [
-  { id: '001', nome: 'Arroz Tio João 5kg',        marca: 'Tio João',   descricao: 'Arroz branco tipo 1 pacote 5kg',         preco: 28.90, estoque: 15, categoria: 'grãos',      ean: '7896048007500' },
-  { id: '002', nome: 'Feijão Carioca Camil 1kg',  marca: 'Camil',      descricao: 'Feijão carioca tipo 1 pacote 1kg',        preco:  8.50, estoque: 20, categoria: 'grãos',      ean: '7896006716018' },
-  { id: '003', nome: 'Feijão Preto Camil 1kg',    marca: 'Camil',      descricao: 'Feijão preto tipo 1 pacote 1kg',          preco:  9.20, estoque: 12, categoria: 'grãos',      ean: '7896006716025' },
-  { id: '004', nome: 'Óleo de Soja Soya 900ml',   marca: 'Soya',       descricao: 'Óleo de soja refinado garrafa 900ml',     preco:  7.90, estoque: 30, categoria: 'óleos',      ean: '7891107101621' },
-  { id: '005', nome: 'Açúcar Cristal União 1kg',  marca: 'União',      descricao: 'Açúcar cristal pacote 1kg',               preco:  4.50, estoque: 25, categoria: 'mercearia',  ean: '7891910000181' },
-  { id: '006', nome: 'Macarrão Espaguete Barilla 500g', marca: 'Barilla', descricao: 'Macarrão espaguete nº5 pacote 500g',  preco:  3.90, estoque: 40, categoria: 'massas',     ean: '8076800195057' },
-  { id: '007', nome: 'Macarrão Parafuso Barilla 500g',  marca: 'Barilla', descricao: 'Macarrão parafuso fusilli pacote 500g', preco: 3.90, estoque: 35, categoria: 'massas',     ean: '8076800195064' },
-  { id: '008', nome: 'Leite Integral Parmalat 1L', marca: 'Parmalat',  descricao: 'Leite UHT integral caixa 1 litro',        preco:  5.20, estoque: 50, categoria: 'laticínios', ean: '7891097100047' },
-  { id: '009', nome: 'Leite Desnatado Parmalat 1L', marca: 'Parmalat', descricao: 'Leite UHT desnatado caixa 1 litro',       preco:  5.50, estoque: 20, categoria: 'laticínios', ean: '7891097100054' },
-  { id: '010', nome: 'Manteiga Aviação 200g',      marca: 'Aviação',   descricao: 'Manteiga com sal tablete 200g',           preco: 12.90, estoque: 15, categoria: 'laticínios', ean: '7891097100078' },
-  { id: '011', nome: 'Queijo Mussarela Faixa Azul 500g', marca: 'Faixa Azul', descricao: 'Queijo mussarela fatiado 500g',   preco: 24.90, estoque:  8, categoria: 'laticínios', ean: '7891097100092' },
-  { id: '012', nome: 'Refrigerante Coca-Cola 2L',  marca: 'Coca-Cola', descricao: 'Refrigerante cola garrafa 2 litros',      preco:  9.90, estoque: 24, categoria: 'bebidas',    ean: '7894900011517' },
-  { id: '013', nome: 'Refrigerante Guaraná Antarctica 2L', marca: 'Antarctica', descricao: 'Refrigerante guaraná garrafa 2L', preco: 7.90, estoque: 18, categoria: 'bebidas',   ean: '7891991010051' },
-  { id: '014', nome: 'Água Mineral Crystal 1,5L',  marca: 'Crystal',   descricao: 'Água mineral sem gás garrafa 1,5 litro',  preco:  2.50, estoque: 60, categoria: 'bebidas',    ean: '7894900700015' },
-  { id: '015', nome: 'Cerveja Skol Lata 350ml',    marca: 'Skol',      descricao: 'Cerveja pilsen lata 350ml',               preco:  4.50, estoque: 48, categoria: 'bebidas',    ean: '7891991000052' },
-  { id: '016', nome: 'Pão de Forma Wickbold 500g', marca: 'Wickbold',  descricao: 'Pão de forma tradicional fatiado 500g',   preco:  7.90, estoque: 10, categoria: 'padaria',    ean: '7896071012108' },
-  { id: '017', nome: 'Biscoito Maizena Piraquê 400g', marca: 'Piraquê', descricao: 'Biscoito maizena pacote 400g',          preco:  5.90, estoque:  0, categoria: 'biscoitos',  ean: '7896024400012' }, // sem estoque
-  { id: '018', nome: 'Biscoito Recheado Oreo 130g', marca: 'Oreo',     descricao: 'Biscoito recheado chocolate pacote 130g', preco:  3.50, estoque: 30, categoria: 'biscoitos',  ean: '7622300441937' },
-  { id: '019', nome: 'Sabão em Pó OMO 1kg',        marca: 'OMO',       descricao: 'Sabão em pó multiação pacote 1kg',        preco: 14.90, estoque: 20, categoria: 'limpeza',    ean: '7891150062108' },
-  { id: '020', nome: 'Detergente Ypê 500ml',       marca: 'Ypê',       descricao: 'Detergente neutro frasco 500ml',          preco:  2.90, estoque: 35, categoria: 'limpeza',    ean: '7896098900244' },
-];
+// ─── Calcula itens favoritos e cruza com ofertas ───
+function analisarHistorico(cliente) {
+  if (!cliente.historico_pedidos || cliente.historico_pedidos.length === 0) {
+    return { ultimo_pedido: null, favoritos: [], favoritos_em_oferta: [] };
+  }
+
+  // Último pedido
+  const ultimo = cliente.historico_pedidos[0];
+
+  // Contagem total por produto em todos os pedidos
+  const contagem = {};
+  for (const pedido of cliente.historico_pedidos) {
+    for (const item of pedido.itens) {
+      if (!contagem[item.id]) contagem[item.id] = { id: item.id, nome: item.nome, total: 0 };
+      contagem[item.id].total += item.quantidade;
+    }
+  }
+
+  // Ordena por quantidade total (favoritos primeiro)
+  const favoritos = Object.values(contagem)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  // Cruza favoritos com produtos em oferta
+  const favoritosEmOferta = favoritos
+    .map(fav => {
+      const prod = produtos.find(p => p.id === fav.id);
+      if (prod && prod.oferta && prod.estoque > 0) {
+        return {
+          id: fav.id,
+          nome: fav.nome,
+          preco_normal: prod.preco,
+          preco_oferta: prod.preco_oferta,
+          descricao_oferta: prod.descricao_oferta,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean);
+
+  return {
+    ultimo_pedido: {
+      data: ultimo.data,
+      numero: ultimo.numero,
+      itens: ultimo.itens,
+    },
+    favoritos,
+    favoritos_em_oferta: favoritosEmOferta,
+  };
+}
 
 // ─── Normaliza unidades de peso/volume para busca ───
 function normalizarUnidades(texto) {
@@ -80,7 +172,6 @@ function pareceCodBarras(termo) {
 async function buscarProduto(termo) {
   const original = termo.trim();
 
-  // Busca exata por código de barras
   if (pareceCodBarras(original)) {
     const porEan = produtos.filter(p => p.ean === original || p.ean.endsWith(original));
     if (porEan.length) return porEan;
@@ -89,26 +180,18 @@ async function buscarProduto(termo) {
   const t = normalizarUnidades(original);
 
   return produtos.filter(p => {
-    const campos = [
-      p.nome,
-      p.marca,
-      p.descricao,
-      p.categoria,
-      p.ean,
-    ].map(c => normalizarUnidades(c));
-
-    // Verifica se algum campo contém o termo buscado
+    const campos = [p.nome, p.marca, p.descricao, p.categoria, p.ean].map(c => normalizarUnidades(c));
     return campos.some(c => c.includes(t));
   });
 }
 
-// Simula pedidos ativos no sistema (em produção vem da API real)
+// ─── Simula pedidos ativos ───
 function getPedidosAtivos() {
   const hora = new Date().getHours();
   let base;
-  if (hora >= 11 && hora <= 13) base = 15;      // horário de almoço
-  else if (hora >= 18 && hora <= 21) base = 18; // horário de jantar
-  else if (hora >= 8 && hora <= 10) base = 5;   // manhã tranquila
+  if (hora >= 11 && hora <= 13) base = 15;
+  else if (hora >= 18 && hora <= 21) base = 18;
+  else if (hora >= 8 && hora <= 10) base = 5;
   else base = 8;
   return base + Math.floor(Math.random() * 6);
 }
@@ -131,30 +214,23 @@ async function criarPedido(pedido) {
   const numero = `PED-${pedidoCounter}`;
   console.log('\n📋 ─── PEDIDO CRIADO (MOCK) ───');
   console.log(JSON.stringify(pedido, null, 2));
-  return {
-    id: numero,
-    numero,
-    status: 'recebido',
-    previsao_entrega: '30-45 minutos',
-  };
+  return { id: numero, numero, status: 'recebido', previsao_entrega: '30-45 minutos' };
 }
 
 async function consultarDemanda() {
   const ativos = getPedidosAtivos();
   let minutos, descricao;
-
-  if (ativos <= 4)       { minutos = 30; descricao = 'baixa'; }
-  else if (ativos <= 9)  { minutos = 45; descricao = 'moderada'; }
-  else if (ativos <= 15) { minutos = 60; descricao = 'alta'; }
-  else if (ativos <= 22) { minutos = 90; descricao = 'muito alta'; }
+  if (ativos <= 4)       { minutos = 30;  descricao = 'baixa'; }
+  else if (ativos <= 9)  { minutos = 45;  descricao = 'moderada'; }
+  else if (ativos <= 15) { minutos = 60;  descricao = 'alta'; }
+  else if (ativos <= 22) { minutos = 90;  descricao = 'muito alta'; }
   else                   { minutos = 120; descricao = 'altíssima'; }
-
   return { pedidosAtivos: ativos, tempoEstimado: minutos, demanda: descricao };
 }
 
-// ─── Busca cliente por CPF, telefone ou nome ───
+// ─── Busca cliente por CPF, telefone ou nome + histórico ───
 async function buscarCliente(identificador) {
-  const id = identificador.replace(/\D/g, ''); // remove pontuação para comparar números
+  const id = identificador.replace(/\D/g, '');
 
   const cliente = clientes.find(c => {
     const cpfLimpo = c.cpf.replace(/\D/g, '');
@@ -168,7 +244,19 @@ async function buscarCliente(identificador) {
     );
   });
 
-  return cliente || null;
+  if (!cliente) return null;
+
+  const historico = analisarHistorico(cliente);
+  return {
+    id: cliente.id,
+    nome: cliente.nome,
+    cpf: cliente.cpf,
+    telefone: cliente.telefone,
+    endereco: cliente.endereco,
+    forma_pagamento_preferida: cliente.forma_pagamento_preferida,
+    total_pedidos: cliente.historico_pedidos.length,
+    ...historico,
+  };
 }
 
 module.exports = { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente };
