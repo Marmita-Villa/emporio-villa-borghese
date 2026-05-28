@@ -103,4 +103,22 @@ async function consultarDemanda() {
   }
 }
 
-module.exports = { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda };
+// ─── Busca cliente por CPF, telefone ou nome ───
+async function buscarCliente(identificador) {
+  try {
+    // Detecta se é CPF (11 dígitos) ou telefone (8–11 dígitos) ou nome
+    const apenasNumeros = identificador.replace(/\D/g, '');
+    const params = apenasNumeros.length >= 8
+      ? { cpf: apenasNumeros.length === 11 ? apenasNumeros : undefined, telefone: apenasNumeros.length !== 11 ? apenasNumeros : undefined }
+      : { nome: identificador };
+
+    const res = await api.get('/clientes/buscar', { params });
+    return res.data || null;
+  } catch (err) {
+    if (err.response?.status === 404) return null;
+    console.error('Erro ao buscar cliente:', err.message);
+    return null;
+  }
+}
+
+module.exports = { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente };

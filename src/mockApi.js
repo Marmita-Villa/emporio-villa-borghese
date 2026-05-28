@@ -1,5 +1,42 @@
 // ─── Dados fictícios para teste local (sem API real) ───
 
+// ─── Base de clientes mock ───
+const clientes = [
+  {
+    id: 'CLI001',
+    nome: 'Ana Paula Silva',
+    cpf: '123.456.789-00',
+    telefone: '13991234567',
+    email: 'ana@email.com',
+    endereco: 'Rua das Flores, 123, Boqueirão, Santos/SP',
+    forma_pagamento_preferida: 'Pix',
+    pedidos_anteriores: 12,
+    ultimo_pedido: '2025-05-20',
+  },
+  {
+    id: 'CLI002',
+    nome: 'Carlos Eduardo Mendes',
+    cpf: '987.654.321-00',
+    telefone: '13996543210',
+    email: 'carlos@email.com',
+    endereco: 'Av. Ana Costa, 456, Vila Belmiro, Santos/SP',
+    forma_pagamento_preferida: 'Cartão de crédito',
+    pedidos_anteriores: 3,
+    ultimo_pedido: '2025-04-15',
+  },
+  {
+    id: 'CLI003',
+    nome: 'Matheus Martins',
+    cpf: '111.222.333-44',
+    telefone: '13996091024',
+    email: 'matheus@emporiovillaborghese.com.br',
+    endereco: 'Rua Mato Grosso, 404, Santos/SP',
+    forma_pagamento_preferida: 'Pix',
+    pedidos_anteriores: 47,
+    ultimo_pedido: '2025-05-27',
+  },
+];
+
 const produtos = [
   { id: '001', nome: 'Arroz Tio João 5kg',        marca: 'Tio João',   descricao: 'Arroz branco tipo 1 pacote 5kg',         preco: 28.90, estoque: 15, categoria: 'grãos',      ean: '7896048007500' },
   { id: '002', nome: 'Feijão Carioca Camil 1kg',  marca: 'Camil',      descricao: 'Feijão carioca tipo 1 pacote 1kg',        preco:  8.50, estoque: 20, categoria: 'grãos',      ean: '7896006716018' },
@@ -115,4 +152,23 @@ async function consultarDemanda() {
   return { pedidosAtivos: ativos, tempoEstimado: minutos, demanda: descricao };
 }
 
-module.exports = { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda };
+// ─── Busca cliente por CPF, telefone ou nome ───
+async function buscarCliente(identificador) {
+  const id = identificador.replace(/\D/g, ''); // remove pontuação para comparar números
+
+  const cliente = clientes.find(c => {
+    const cpfLimpo = c.cpf.replace(/\D/g, '');
+    const telLimpo = c.telefone.replace(/\D/g, '');
+    const nomeLower = c.nome.toLowerCase();
+    return (
+      cpfLimpo === id ||
+      telLimpo === id ||
+      telLimpo.endsWith(id) ||
+      nomeLower.includes(identificador.toLowerCase())
+    );
+  });
+
+  return cliente || null;
+}
+
+module.exports = { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente };

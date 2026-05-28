@@ -1,11 +1,22 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const apiModule = process.env.MOCK_MODE === 'true' ? require('./mockApi') : require('./sistemaApi');
-const { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda } = apiModule;
+const { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente } = apiModule;
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // ─── Ferramentas disponíveis para a IA ───
 const tools = [
+  {
+    name: 'buscar_cliente',
+    description: 'Busca o cadastro do cliente no sistema pelo CPF, telefone ou nome. Use SEMPRE logo que o cliente se identificar no formulário, antes de processar o pedido.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        identificador: { type: 'string', description: 'CPF (ex: 123.456.789-00), telefone (ex: 13991234567) ou nome completo do cliente' },
+      },
+      required: ['identificador'],
+    },
+  },
   {
     name: 'buscar_produtos',
     description: 'Busca produtos no estoque por nome, marca, descrição, peso (ex: 500g, 1kg), volume (ex: 900ml, 2L) ou código de barras EAN13. Use para verificar o que tem disponível.',
@@ -71,6 +82,27 @@ const tools = [
 async function executarFerramenta(nomeFerramenta, inputs, session) {
   console.log(`🔧 IA chamou ferramenta: ${nomeFerramenta}`, inputs);
 
+  if (nomeFerramenta === 'buscar_cliente') {
+    const cliente = await buscarCliente(inputs.identificador);
+    if (!cliente) {
+      return `Cliente não encontrado no cadastro. Tratar como novo cliente.`;
+    }
+    // Salva nome na sessão para usar no pedido
+    session.customerName = cliente.nome;
+    const vezes = cliente.pedidos_anteriores;
+    const ultimoPedido = cliente.ultimo_pedido
+      ? new Date(cliente.ultimo_pedido).toLocaleDateString('pt-BR')
+      : null;
+    return `Cliente encontrado! ✅
+Nome: ${cliente.nome}
+CPF: ${cliente.cpf}
+Telefone: ${cliente.telefone}
+Endereço cadastrado: ${cliente.endereco}
+Pagamento preferido: ${cliente.forma_pagamento_preferida}
+Pedidos anteriores: ${vezes} pedido(s)${ultimoPedido ? ` | Último pedido: ${ultimoPedido}` : ''}
+Trate como cliente ${vezes > 5 ? 'fiel e frequente' : vezes > 0 ? 'recorrente' : 'novo'} e cumprimente pelo nome com carinho.`;
+  }
+
   if (nomeFerramenta === 'buscar_produtos') {
     const produtos = await buscarProduto(inputs.termo);
     if (!produtos.length) return `Não encontrei produtos com o termo "${inputs.termo}".`;
@@ -130,7 +162,13 @@ Você é uma pessoa real, calorosa e animada. Fala como uma amiga que entende be
 
 DATA E HORA ATUAL: ${agora}
 
-O cliente já foi recebido com boas-vindas e um formulário. A primeira mensagem que você vai receber é o formulário preenchido com: Nome Completo, CPF, Telefone, Endereço, Forma de pagamento, Pedido e se aceita marcas similares. Cumprimente o cliente pelo nome, extraia todos os itens do pedido, verifique o estoque de cada um e processe o pedido normalmente.
+O cliente já foi recebido com boas-vindas e um formulário. A primeira mensagem que você vai receber é o formulário preenchido com: Nome Completo, CPF, Telefone, Endereço, Forma de pagamento, Pedido e se aceita marcas similares.
+
+AO RECEBER O FORMULÁRIO:
+1. Use SEMPRE a ferramenta buscar_cliente com o CPF ou telefone informado
+2. Se encontrar cadastro: cumprimente pelo nome com carinho, mencione que já conhece o cliente (ex: "Que saudade! Já é seu 12º pedido aqui no Villa!") e confirme ou use o endereço cadastrado
+3. Se não encontrar: cumprimente pelo nome normalmente e trate como novo cliente
+4. Após identificar o cliente, extraia os itens do pedido, verifique o estoque e processe normalmente
 
 NOSSAS UNIDADES E HORÁRIOS:
 • Rua Mato Grosso, 404, Santos/SP — Seg. a Sáb. das 8h às 21h | Dom. das 8h às 14h
