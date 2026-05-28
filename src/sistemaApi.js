@@ -106,11 +106,16 @@ async function consultarDemanda() {
 // ─── Busca cliente por CPF, telefone ou nome ───
 async function buscarCliente(identificador) {
   try {
-    // Detecta se é CPF (11 dígitos) ou telefone (8–11 dígitos) ou nome
     const apenasNumeros = identificador.replace(/\D/g, '');
-    const params = apenasNumeros.length >= 8
-      ? { cpf: apenasNumeros.length === 11 ? apenasNumeros : undefined, telefone: apenasNumeros.length !== 11 ? apenasNumeros : undefined }
-      : { nome: identificador };
+    let params = {};
+
+    if (apenasNumeros.length === 11) {
+      params = { cpf: apenasNumeros };           // CPF: exatamente 11 dígitos
+    } else if (apenasNumeros.length >= 8) {
+      params = { telefone: apenasNumeros };      // Telefone: 8–10 dígitos
+    } else {
+      params = { nome: identificador };          // Nome: texto livre
+    }
 
     const res = await api.get('/clientes/buscar', { params });
     return res.data || null;

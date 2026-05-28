@@ -8,13 +8,15 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const tools = [
   {
     name: 'buscar_cliente',
-    description: 'Busca o cadastro do cliente no sistema pelo CPF, telefone ou nome. Use SEMPRE logo que o cliente se identificar no formulário, antes de processar o pedido.',
+    description: 'Busca o cadastro do cliente no sistema. Use SEMPRE ao receber o formulário, passando CPF, telefone e nome juntos para maximizar as chances de encontrar o cadastro.',
     input_schema: {
       type: 'object',
       properties: {
-        identificador: { type: 'string', description: 'CPF (ex: 123.456.789-00), telefone (ex: 13991234567) ou nome completo do cliente' },
+        cpf:      { type: 'string', description: 'CPF do cliente (ex: 123.456.789-00)' },
+        telefone: { type: 'string', description: 'Telefone do cliente (ex: 13991234567)' },
+        nome:     { type: 'string', description: 'Nome completo do cliente' },
       },
-      required: ['identificador'],
+      required: [],
     },
   },
   {
@@ -83,7 +85,11 @@ async function executarFerramenta(nomeFerramenta, inputs, session) {
   console.log(`🔧 IA chamou ferramenta: ${nomeFerramenta}`, inputs);
 
   if (nomeFerramenta === 'buscar_cliente') {
-    const cliente = await buscarCliente(inputs.identificador);
+    // Tenta encontrar o cliente por CPF, telefone ou nome (na ordem de prioridade)
+    let cliente = null;
+    if (inputs.cpf)      cliente = await buscarCliente(inputs.cpf);
+    if (!cliente && inputs.telefone) cliente = await buscarCliente(inputs.telefone);
+    if (!cliente && inputs.nome)     cliente = await buscarCliente(inputs.nome);
     if (!cliente) {
       return `Cliente não encontrado no cadastro. Tratar como novo cliente.`;
     }
