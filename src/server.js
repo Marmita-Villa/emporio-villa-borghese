@@ -8,6 +8,36 @@ const { processarMensagem } = require('./atendimento');
 const app = express();
 app.use(express.json());
 
+// ─── Deduplicação de mensagens (evita reprocessar webhooks duplicados da Meta) ───
+const mensagensProcessadas = new Set();
+setInterval(() => mensagensProcessadas.clear(), 10 * 60 * 1000); // limpa a cada 10 min
+
+// ─── Rate limiting simples por número de telefone ───
+const rateLimitMap = new Map(); // phone → { count, resetAt }
+const RATE_LIMIT_MAX = 10;       // máximo de mensagens por janela
+const RATE_LIMIT_JANELA_MS = 60 * 1000; // janela de 1 minuto
+
+function checkRateLimit(phone) {
+  const agora = Date.now();
+  const entrada = rateLimitMap.get(phone);
+
+  if (!entrada || agora > entrada.resetAt) {
+    rateLimitMap.set(phone, { count: 1, resetAt: agora + RATE_LIMIT_JANELA_MS });
+    return true;
+  }
+
+  entrada.count++;
+  if (entrada.count > RATE_LIMIT_MAX) return false;
+  return true;
+}
+
+setInterval(() => {
+  const agora = Date.now();
+  for (const [phone, entrada] of rateLimitMap.entries()) {
+    if (agora > entrada.resetAt) rateLimitMap.delete(phone);
+  }
+}, 5 * 60 * 1000);
+
 // ─── Verificação do webhook (Meta exige isso na configuração inicial) ───
 app.get('/webhook', (req, res) => {
   const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
@@ -36,8 +66,21 @@ app.post('/webhook', async (req, res) => {
     if (!messages || messages.length === 0) return res.sendStatus(200);
 
     const message = messages[0];
-    const from = message.from; // número do cliente
+    const from = message.from;
     const text = message.text?.body;
+    const messageId = message.id;
+
+    // Ignora mensagem já processada (webhook duplicado da Meta)
+    if (messageId && mensagensProcessadas.has(messageId)) {
+      return res.sendStatus(200);
+    }
+    if (messageId) mensagensProcessadas.add(messageId);
+
+    // Bloqueia se o número ultrapassou o rate limit
+    if (!checkRateLimit(from)) {
+      console.warn(`⚠️ Rate limit atingido para ${from} — mensagem ignorada`);
+      return res.sendStatus(200);
+    }
 
     if (message.type === 'text' && text) {
       console.log(`📩 Mensagem de ${from}: ${text}`);
@@ -52,15 +95,6 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
-
-app.get('/debug', (req, res) => {
-  const key = process.env.ANTHROPIC_API_KEY;
-  res.json({
-    mock_mode: process.env.MOCK_MODE,
-    api_key_carregada: !!key,
-    api_key_inicio: key ? key.substring(0, 15) + '...' : 'NÃO ENCONTRADA',
-  });
-});
 
 // ─── Endpoint de teste local (sem WhatsApp) ───
 app.post('/chat', async (req, res) => {

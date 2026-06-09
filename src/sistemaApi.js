@@ -1,7 +1,8 @@
 const axios = require('axios');
 
+// ─── Cliente HTTP — base: https://api.emporiovillaborghese.com.br ───
 const api = axios.create({
-  baseURL: process.env.SISTEMA_API_URL,      // ex: https://meusite.com.br/api
+  baseURL: process.env.SISTEMA_API_URL || 'https://api.emporiovillaborghese.com.br',
   headers: {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${process.env.SISTEMA_API_TOKEN}`,
@@ -9,120 +10,140 @@ const api = axios.create({
   timeout: 10000,
 });
 
-// ─── Busca todos os produtos disponíveis no estoque ───
-async function getProdutos(categoria = null) {
-  try {
-    const params = categoria ? { categoria } : {};
-    const res = await api.get('/produtos', { params });
-    return res.data; // espera array de produtos
-  } catch (err) {
-    console.error('Erro ao buscar produtos:', err.message);
-    return [];
-  }
-}
-
-// ─── Verifica se o termo é um código de barras EAN (8–13 dígitos) ───
+// ─── Detecta se o termo é um código de barras EAN (8–13 dígitos numéricos) ───
 function pareceCodBarras(termo) {
   return /^\d{8,13}$/.test(termo.trim());
 }
 
-// ─── Busca produto por nome, marca, descrição, peso (kg/g) ou EAN13 ───
+// ─── A.1 — Busca produtos por nome, SKU ou EAN ───
+// GET /produtos/buscar
+// Params: q (nome parcial), ean (código de barras), campos, limit, page
 async function buscarProduto(termo) {
   try {
     const params = pareceCodBarras(termo.trim())
-      ? { ean: termo.trim() }                  // busca direta por código de barras
-      : { q: termo, campos: 'nome,marca,descricao,categoria,ean' }; // busca ampla
+      ? { ean: termo.trim(), campos: 'id,nome,preco,estoque,ean' }
+      : { q: termo.trim(), campos: 'id,nome,preco,estoque,ean', limit: 8 };
 
     const res = await api.get('/produtos/buscar', { params });
-    return res.data;
+    // Garante retorno de array mesmo se vier objeto único
+    return Array.isArray(res.data) ? res.data : (res.data ? [res.data] : []);
   } catch (err) {
     console.error('Erro ao buscar produto:', err.message);
     return [];
   }
 }
 
-// ─── Verifica estoque de um produto específico ───
+// ─── A.1 — Alias para listagem geral (não usada pela IA mas exportada por compatibilidade) ───
+async function getProdutos() {
+  try {
+    const res = await api.get('/produtos/buscar', { params: { limit: 'all', campos: 'id,nome,preco,estoque' } });
+    return Array.isArray(res.data) ? res.data : [];
+  } catch (err) {
+    console.error('Erro ao listar produtos:', err.message);
+    return [];
+  }
+}
+
+// ─── A.2 — Verifica estoque de um produto específico ───
+// GET /produtos/:id/estoque  →  { "disponivel": true, "quantidade": 99999 }
 async function verificarEstoque(produtoId) {
   try {
     const res = await api.get(`/produtos/${produtoId}/estoque`);
-    return res.data; // { disponivel: true, quantidade: 15 }
+    return res.data; // { disponivel: boolean, quantidade: number }
   } catch (err) {
+    if (err.response?.status === 404) return { disponivel: false, quantidade: 0 };
     console.error('Erro ao verificar estoque:', err.message);
     return { disponivel: false, quantidade: 0 };
   }
 }
 
-// ─── Cria o pedido no sistema interno ───
-async function criarPedido(pedido) {
-  try {
-    const payload = {
-      cliente: {
-        telefone: pedido.telefone,
-        nome: pedido.nomeCliente,
-        endereco: pedido.endereco,
-      },
-      itens: pedido.itens.map(item => ({
-        produto_id: item.id,
-        nome: item.nome,
-        quantidade: item.quantidade,
-        preco_unitario: item.preco,
-      })),
-      total: pedido.total,
-      forma_pagamento: pedido.formaPagamento,
-      observacoes: pedido.observacoes || '',
-      canal: 'whatsapp',
-      criado_em: new Date().toISOString(),
-    };
-
-    const res = await api.post('/pedidos', payload);
-    console.log(`✅ Pedido #${res.data.id} criado no sistema`);
-    return res.data; // { id, numero, status, previsao_entrega }
-  } catch (err) {
-    console.error('Erro ao criar pedido:', err.message);
-    throw new Error('Não foi possível registrar o pedido no sistema.');
-  }
-}
-
-// ─── Consulta pedidos ativos para calcular tempo de entrega ───
-async function consultarDemanda() {
-  try {
-    const res = await api.get('/pedidos/ativos');
-    const ativos = Array.isArray(res.data) ? res.data.length : (res.data.total || 0);
-    let minutos, descricao;
-
-    if (ativos <= 4)       { minutos = 30; descricao = 'baixa'; }
-    else if (ativos <= 9)  { minutos = 45; descricao = 'moderada'; }
-    else if (ativos <= 15) { minutos = 60; descricao = 'alta'; }
-    else if (ativos <= 22) { minutos = 90; descricao = 'muito alta'; }
-    else                   { minutos = 120; descricao = 'altíssima'; }
-
-    return { pedidosAtivos: ativos, tempoEstimado: minutos, demanda: descricao };
-  } catch (err) {
-    console.error('Erro ao consultar demanda:', err.message);
-    return { pedidosAtivos: 0, tempoEstimado: 45, demanda: 'desconhecida' };
-  }
-}
-
-// ─── Busca cliente por CPF, telefone ou nome ───
+// ─── B.1 — Busca cliente por CPF, telefone ou nome ───
+// GET /clientes/buscar
+// Params: cpf (sem pontuação), telefone (com DDD), nome, incluir_historico
+// Resposta: { id, nome, cpf, telefone, endereco, forma_pagamento_preferida, ... }
 async function buscarCliente(identificador) {
   try {
     const apenasNumeros = identificador.replace(/\D/g, '');
     let params = {};
 
     if (apenasNumeros.length === 11) {
-      params = { cpf: apenasNumeros };           // CPF: exatamente 11 dígitos
+      params = { cpf: apenasNumeros };           // CPF: exatamente 11 dígitos sem pontuação
     } else if (apenasNumeros.length >= 8) {
-      params = { telefone: apenasNumeros };      // Telefone: 8–10 dígitos
+      params = { telefone: apenasNumeros };      // Telefone com DDD
     } else {
-      params = { nome: identificador };          // Nome: texto livre
+      params = { nome: identificador };          // Nome parcial
     }
 
-    const res = await api.get('/clientes/buscar', { params: { ...params, incluir_historico: true } });
+    const res = await api.get('/clientes/buscar', {
+      params: { ...params, incluir_historico: true },
+    });
     return res.data || null;
   } catch (err) {
     if (err.response?.status === 404) return null;
     console.error('Erro ao buscar cliente:', err.message);
     return null;
+  }
+}
+
+// ─── C.1 — Cria pedido na retaguarda ───
+// POST /pedidos
+// Endereço obrigatório no formato: "Rua, Número, Bairro, Cidade/UF, CEP" (CEP com 8 dígitos)
+// produto_id pode ser o objectId do Parse, SKU ou EAN
+// Retorno: { id, numero, status: "recebido", previsao_entrega }
+// Erro 400 se CEP não atendido: { status: 400, message: "Erro no endereço: Não entregamos para essa região." }
+async function criarPedido(pedido) {
+  try {
+    const payload = {
+      cliente: {
+        telefone: pedido.telefone,
+        nome: pedido.nomeCliente,
+        endereco: pedido.endereco, // "Rua, Número, Bairro, Cidade/UF, CEP"
+      },
+      itens: pedido.itens.map(item => ({
+        produto_id: item.id,
+        nome: item.nome,
+        quantidade: item.quantidade,
+        // Nota: a API não exige preco_unitario no body, mas enviamos para registro
+        preco_unitario: item.preco,
+      })),
+      total: pedido.total,
+      forma_pagamento: pedido.formaPagamento,
+      observacoes: pedido.observacoes || '',
+      canal: 'whatsapp',
+    };
+
+    const res = await api.post('/pedidos', payload);
+    console.log(`✅ Pedido #${res.data.numero || res.data.id} criado no sistema`);
+    return res.data; // { id, numero, status, previsao_entrega }
+  } catch (err) {
+    // Erro 400 = endereço fora de cobertura ou dados inválidos
+    if (err.response?.status === 400) {
+      const msg = err.response.data?.message || 'Endereço inválido ou fora de cobertura.';
+      throw new Error(msg);
+    }
+    console.error('Erro ao criar pedido:', err.response?.data || err.message);
+    throw new Error('Não foi possível registrar o pedido no sistema.');
+  }
+}
+
+// ─── C.2 — Consulta pedidos ativos para estimar tempo de entrega ───
+// GET /pedidos/ativos  →  { "ativos": 12 }
+async function consultarDemanda() {
+  try {
+    const res = await api.get('/pedidos/ativos');
+    const ativos = res.data?.ativos ?? 0; // campo "ativos" conforme documentação
+
+    let minutos, descricao;
+    if (ativos <= 4)       { minutos = 30;  descricao = 'baixa'; }
+    else if (ativos <= 9)  { minutos = 45;  descricao = 'moderada'; }
+    else if (ativos <= 15) { minutos = 60;  descricao = 'alta'; }
+    else if (ativos <= 22) { minutos = 90;  descricao = 'muito alta'; }
+    else                   { minutos = 120; descricao = 'altíssima'; }
+
+    return { pedidosAtivos: ativos, tempoEstimado: minutos, demanda: descricao };
+  } catch (err) {
+    console.error('Erro ao consultar demanda:', err.message);
+    return { pedidosAtivos: 0, tempoEstimado: 45, demanda: 'desconhecida' };
   }
 }
 

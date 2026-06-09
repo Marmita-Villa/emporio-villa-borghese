@@ -2,13 +2,13 @@
 // Em produção, use Redis para persistir entre reinicializações
 const sessions = new Map();
 
-const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos de inatividade encerra sessão
+const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos de inatividade encerra a sessão
 
 function getSession(phone) {
   const session = sessions.get(phone);
   if (!session) return null;
 
-  // Encerra sessão se ficou mais de 30 min inativo
+  // Encerra sessão se ficou mais de 15 min inativo
   if (Date.now() - session.lastActivity > SESSION_TIMEOUT_MS) {
     sessions.delete(phone);
     return null;
