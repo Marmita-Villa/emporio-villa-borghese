@@ -1,4 +1,5 @@
 const { processarComIA } = require('./ia');
+const logger = require('./logger');
 
 const MENU_MSG = `Olá! 👋 Bem-vindo ao *Villa Borghese Empório*!
 
@@ -9,12 +10,14 @@ Como prefere ser atendido?
 
 Digite *1* ou *2*`;
 
+// ─── CEP obrigatório no campo endereço para a API funcionar ───
 const FORM_MSG = `Para prosseguir seu atendimento por WhatsApp, preencha os campos abaixo e aguarde que um de nossos colaboradores irá lhe atender:
 
 *Nome Completo:*
 *CPF:*
 *Telefone:*
-*Endereço:*
+*Endereço (Rua, Número, Bairro, Cidade/UF, CEP):*
+_Ex: Rua das Flores, 123, Boqueirão, Santos/SP, 11045-001_
 *Forma de pagamento:*
 *Pedido:*
 
@@ -38,6 +41,8 @@ const BOAS_VINDAS_HUMANO = `Olá! Seja bem-vindo ao delivery do *Empório Villa 
 
 Estamos com mais um canal de atendimento para realizar suas compras, através do nosso site www.emporiovillaborghese.com.br`;
 
+const NOVO_PEDIDO_MSG = `Que ótimo! 🛒 Para fazer um novo pedido, preencha o formulário abaixo:`;
+
 // ─── Roteador principal de atendimento ───
 async function processarMensagem(session, texto) {
 
@@ -55,13 +60,12 @@ async function processarMensagem(session, texto) {
 
     if (escolheuVirtual) {
       session.step = 'ai';
-      // Retorna array: duas mensagens separadas
       return [BOAS_VINDAS_MAITHE, FORM_MSG];
     }
 
     if (escolheuHumano) {
       session.step = 'humano';
-      console.log(`🙋 Cliente ${session.phone} solicitou atendente humano`);
+      logger.info(`Cliente solicitou atendente humano`, { phone: session.phone });
       return [BOAS_VINDAS_HUMANO, FORM_MSG];
     }
 
@@ -75,9 +79,32 @@ async function processarMensagem(session, texto) {
       session.step = 'ai';
       return [BOAS_VINDAS_MAITHE, FORM_MSG];
     }
-    // Formulário recebido — notifica equipe via log
-    console.log(`📋 Formulário recebido de ${session.phone}:\n${texto}`);
+    logger.info(`Formulário humano recebido`, { phone: session.phone });
     return `Recebemos seu pedido! ✅\n\nUm de nossos atendentes vai te chamar em breve para confirmar tudo. 😊\n\nSe mudar de ideia, manda *1* para falar com a Maithe agora.`;
+  }
+
+  // ── Pedido concluído: permite iniciar novo pedido sem reiniciar a conversa ──
+  if (session.step === 'done') {
+    const texto_lower = texto.trim().toLowerCase();
+    const querNovoPedido =
+      texto_lower.includes('novo pedido') ||
+      texto_lower.includes('quero mais') ||
+      texto_lower.includes('pedir mais') ||
+      texto_lower.includes('mais alguma') ||
+      texto_lower.includes('outro pedido') ||
+      texto_lower.includes('sim') ||
+      texto_lower === 's' ||
+      texto_lower === '1';
+
+    if (querNovoPedido) {
+      // Reinicia histórico da IA mas mantém dados do cliente
+      session.messages = [];
+      session.cart = [];
+      session.step = 'ai';
+      return [NOVO_PEDIDO_MSG, FORM_MSG];
+    }
+
+    return `Obrigada pela preferência! 😊 Se precisar de qualquer coisa, é só mandar mensagem que a gente te atende.\n\nAté a próxima! 👋`;
   }
 
   // ── Modo IA: Maithe processa o formulário e os pedidos ──

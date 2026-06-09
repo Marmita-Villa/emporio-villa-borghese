@@ -1,7 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { handleIncomingMessage, enviarMensagem } = require('./whatsapp');
+const { handleIncomingMessage, handleNonTextMessage, enviarMensagem } = require('./whatsapp');
+const logger = require('./logger');
 const { getOrCreateSession, clearSession, verificarSessoesExpiradas } = require('./session');
 const { processarMensagem } = require('./atendimento');
 
@@ -46,7 +47,7 @@ app.get('/webhook', (req, res) => {
   const challenge = req.query['hub.challenge'];
 
   if (mode === 'subscribe' && token === VERIFY_TOKEN) {
-    console.log('✅ Webhook verificado pela Meta');
+    logger.info('Webhook verificado pela Meta');
     return res.status(200).send(challenge);
   }
   res.sendStatus(403);
@@ -78,18 +79,21 @@ app.post('/webhook', async (req, res) => {
 
     // Bloqueia se o número ultrapassou o rate limit
     if (!checkRateLimit(from)) {
-      console.warn(`⚠️ Rate limit atingido para ${from} — mensagem ignorada`);
+      logger.warn(`Rate limit atingido`, { from });
       return res.sendStatus(200);
     }
 
     if (message.type === 'text' && text) {
-      console.log(`📩 Mensagem de ${from}: ${text}`);
+      logger.info(`Mensagem recebida`, { from, text: text.substring(0, 80) });
       await handleIncomingMessage(from, text);
+    } else if (message.type !== 'text') {
+      // Áudio, imagem, vídeo, sticker, localização, etc.
+      await handleNonTextMessage(from, message.type);
     }
 
     res.sendStatus(200);
   } catch (err) {
-    console.error('Erro no webhook:', err);
+    logger.error('Erro no webhook', err.message);
     res.sendStatus(500);
   }
 });
@@ -126,17 +130,17 @@ app.use(express.static(path.join(__dirname, '../public')));
 setInterval(async () => {
   const expiradas = verificarSessoesExpiradas();
   for (const { phone } of expiradas) {
-    console.log(`⏰ Sessão expirada por inatividade: ${phone}`);
+    logger.info(`Sessão expirada por inatividade`, { phone });
     try {
       await enviarMensagem(
         phone,
         '👋 Sua conversa foi encerrada por inatividade.\n\nSe precisar de algo é só mandar uma mensagem! 😊'
       );
     } catch (err) {
-      console.error(`Erro ao notificar encerramento para ${phone}:`, err.message);
+      logger.error(`Erro ao notificar encerramento`, { phone, error: err.message });
     }
   }
 }, 2 * 60 * 1000); // a cada 2 minutos
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Bot rodando na porta ${PORT}`));
+app.listen(PORT, () => logger.info(`Bot rodando`, { porta: PORT, env: process.env.MOCK_MODE === 'true' ? 'mock' : 'produção' }));

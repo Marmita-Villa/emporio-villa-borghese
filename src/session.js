@@ -1,6 +1,7 @@
 // Armazena sessão de cada cliente em memória
 // Em produção, use Redis para persistir entre reinicializações
 const sessions = new Map();
+const logger = require('./logger');
 
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutos de inatividade encerra a sessão
 
@@ -15,6 +16,7 @@ function getSession(phone) {
   }
 
   session.lastActivity = Date.now();
+  logger.debug(`Sessão recuperada`, { phone });
   return session;
 }
 

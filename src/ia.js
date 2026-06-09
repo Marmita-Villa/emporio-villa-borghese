@@ -1,6 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const apiModule = process.env.MOCK_MODE === 'true' ? require('./mockApi') : require('./sistemaApi');
 const { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente } = apiModule;
+const logger = require('./logger');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -82,7 +83,7 @@ const tools = [
 
 // ─── Executa a ferramenta chamada pela IA ───
 async function executarFerramenta(nomeFerramenta, inputs, session) {
-  console.log(`🔧 IA chamou ferramenta: ${nomeFerramenta}`, inputs);
+  logger.info(`IA chamou ferramenta: ${nomeFerramenta}`, inputs);
 
   if (nomeFerramenta === 'buscar_cliente') {
     // Tenta encontrar o cliente por CPF, telefone ou nome (na ordem de prioridade)
@@ -166,17 +167,23 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
 
   if (nomeFerramenta === 'finalizar_pedido') {
     const total = inputs.itens.reduce((sum, i) => sum + (i.preco * i.quantidade), 0);
-    const pedido = await criarPedido({
-      telefone: session.phone,
-      nomeCliente: inputs.nome_cliente || session.customerName || 'Cliente WhatsApp',
-      endereco: inputs.endereco,
-      itens: inputs.itens,
-      total,
-      formaPagamento: inputs.forma_pagamento,
-      observacoes: inputs.observacoes,
-    });
-    session.step = 'done';
-    return `Pedido registrado com sucesso! Número: #${pedido.id || pedido.numero}. Total: R$ ${total.toFixed(2)}. Previsão de entrega: ${pedido.previsao_entrega || '30-50 minutos'}.`;
+    try {
+      const pedido = await criarPedido({
+        telefone: session.phone,
+        nomeCliente: inputs.nome_cliente || session.customerName || 'Cliente WhatsApp',
+        endereco: inputs.endereco,
+        itens: inputs.itens,
+        total,
+        formaPagamento: inputs.forma_pagamento,
+        observacoes: inputs.observacoes,
+      });
+      session.step = 'done';
+      return `Pedido registrado com sucesso! Número: #${pedido.id || pedido.numero}. Total: R$ ${total.toFixed(2)}. Previsão de entrega: ${pedido.previsao_entrega || '30-50 minutos'}.`;
+    } catch (err) {
+      // Retorna o erro como resultado da ferramenta para a IA comunicar ao cliente
+      logger.warn(`Erro ao finalizar pedido`, { phone: session.phone, error: err.message });
+      return `ERRO AO REGISTRAR PEDIDO: ${err.message}. Informe o cliente e peça para corrigir o endereço se necessário.`;
+    }
   }
 
   return 'Ferramenta não reconhecida.';
@@ -235,6 +242,9 @@ REGRAS QUE NUNCA QUEBRA:
 - Sempre mostra preço de cada item e o total no resumo
 - Pergunta endereço e forma de pagamento antes de fechar
 - Se o cliente pedir algo que não existe no sistema, sugere o mais próximo disponível
+- O endereço DEVE conter CEP (8 dígitos). Se o cliente não informar o CEP, peça antes de finalizar: "Só preciso do CEP do seu endereço para confirmar a entrega! 😊"
+- Se o sistema retornar erro de endereço (fora de cobertura), informe com simpatia: "Ai, que pena... infelizmente ainda não entregamos nessa região 😔 Se tiver outro endereço de entrega, posso tentar!"
+- Após registrar o pedido com sucesso, pergunte se o cliente quer pedir mais alguma coisa
 
 TAXAS DE ENTREGA (por região):
 • Borghese: R$ 7,50
@@ -313,6 +323,7 @@ async function processarComIA(session, novaMensagem) {
 
     // Salva resposta da IA no histórico da sessão
     session.messages.push({ role: 'assistant', content: textoResposta });
+    logger.debug(`Resposta da IA`, { phone: session.phone, chars: textoResposta.length });
 
     return textoResposta;
   }
