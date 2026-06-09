@@ -21,8 +21,8 @@ function pareceCodBarras(termo) {
 async function buscarProduto(termo) {
   try {
     const params = pareceCodBarras(termo.trim())
-      ? { ean: termo.trim(), campos: 'id,nome,preco,estoque,ean' }
-      : { q: termo.trim(), campos: 'id,nome,preco,estoque,ean', limit: 8 };
+      ? { ean: termo.trim(), campos: 'id,nome,preco,ean' }
+      : { q: termo.trim(), campos: 'id,nome,preco,ean', limit: 8 };
 
     const res = await api.get('/produtos/buscar', { params });
     // Garante retorno de array mesmo se vier objeto único

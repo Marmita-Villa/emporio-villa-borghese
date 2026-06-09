@@ -139,9 +139,9 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
     if (!produtos.length) return `Não encontrei produtos com o termo "${inputs.termo}".`;
 
     const lista = produtos.slice(0, 8).map(p =>
-      `• ${p.nome} — R$ ${p.preco.toFixed(2)} (ID: ${p.id}) ${p.estoque > 0 ? '✅ em estoque' : '❌ sem estoque'}`
+      `• ${p.nome} — R$ ${p.preco.toFixed(2)} (ID: ${p.id})`
     ).join('\n');
-    return `Produtos encontrados:\n${lista}`;
+    return `Produtos encontrados:\n${lista}\n\nUse verificar_estoque para confirmar disponibilidade antes de oferecer ao cliente.`;
   }
 
   if (nomeFerramenta === 'verificar_estoque') {
