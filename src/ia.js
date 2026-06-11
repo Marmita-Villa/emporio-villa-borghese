@@ -33,7 +33,7 @@ const tools = [
   },
   {
     name: 'verificar_estoque',
-    description: 'Verifica em tempo real se um produto tem estoque disponível. DEVE ser chamada obrigatoriamente para cada produto antes de confirmar disponibilidade ao cliente — nunca assuma que um produto está disponível sem chamar esta ferramenta.',
+    description: 'Verifica em tempo real se um produto tem estoque disponível. DEVE ser chamada obrigatoriamente para cada produto antes de confirmar disponibilidade ao cliente — nunca assuma que um produto está disponível sem chamar esta ferramenta. Se precisar verificar múltiplos produtos, chame verificar_estoque várias vezes na mesma resposta — elas serão executadas em paralelo.',
     input_schema: {
       type: 'object',
       properties: {
@@ -135,13 +135,24 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
   }
 
   if (nomeFerramenta === 'buscar_produtos') {
+    const CACHE_TTL = 5 * 60 * 1000;
+    const chave = inputs.termo.toLowerCase().trim();
+    const cached = session.productCache?.[chave];
+    if (cached && Date.now() - cached.ts < CACHE_TTL) {
+      logger.debug(`Cache hit produtos`, { termo: inputs.termo });
+      return cached.result;
+    }
+
     const produtos = await buscarProduto(inputs.termo);
     if (!produtos.length) return `Não encontrei produtos com o termo "${inputs.termo}".`;
 
     const lista = produtos.slice(0, 8).map(p =>
       `• ${p.nome} — R$ ${p.preco.toFixed(2)} (ID: ${p.id})`
     ).join('\n');
-    return `Produtos encontrados:\n${lista}\n\nUse verificar_estoque para confirmar disponibilidade antes de oferecer ao cliente.`;
+    const result = `Produtos encontrados:\n${lista}\n\nUse verificar_estoque para confirmar disponibilidade antes de oferecer ao cliente.`;
+
+    if (session.productCache) session.productCache[chave] = { result, ts: Date.now() };
+    return result;
   }
 
   if (nomeFerramenta === 'verificar_estoque') {

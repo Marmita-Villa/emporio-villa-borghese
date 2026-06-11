@@ -28,6 +28,7 @@ function createSession(phone) {
     step: 'menu',       // etapa atual: menu | aguardando_escolha | ai | humano | done
     lastActivity: Date.now(),
     customerName: null,
+    productCache: {},   // { termo: { result: string, ts: number } } — TTL 5 min
   };
   sessions.set(phone, session);
   return session;
@@ -63,9 +64,11 @@ function addMessageToSession(phone, role, content) {
   const session = getOrCreateSession(phone);
   session.messages.push({ role, content });
 
-  // Mantém apenas as últimas 20 mensagens para não estourar o contexto
+  // Mantém apenas as últimas 20 mensagens (10 trocas), sempre em pares user+assistant
   if (session.messages.length > 20) {
-    session.messages = session.messages.slice(-20);
+    const excesso = session.messages.length - 20;
+    // Remove em número par para não deixar mensagem órfã
+    session.messages = session.messages.slice(excesso % 2 === 0 ? excesso : excesso + 1);
   }
   return session;
 }

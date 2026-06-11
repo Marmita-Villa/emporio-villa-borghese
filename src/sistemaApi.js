@@ -1,4 +1,5 @@
 const axios = require('axios');
+const logger = require('./logger');
 
 // ─── Cliente HTTP — base: https://api.emporiovillaborghese.com.br ───
 const api = axios.create({
@@ -7,12 +8,28 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${process.env.SISTEMA_API_TOKEN}`,
   },
-  timeout: 10000,
+  timeout: 5000,
 });
 
 // ─── Remove acentos para compatibilidade com a API (não suporta caracteres acentuados) ───
 function removerAcentos(texto) {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// ─── Retry automático — tenta novamente uma vez em caso de erro 5xx ───
+async function comRetry(fn, tentativas = 2) {
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const status = err.response?.status;
+      if (i < tentativas - 1 && status >= 500) {
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 // ─── Detecta se o termo é um código de barras EAN (8–13 dígitos numéricos) ───
@@ -30,11 +47,10 @@ async function buscarProduto(termo) {
       ? { ean: termoLimpo, campos: 'id,nome,preco,ean' }
       : { q: termoLimpo, campos: 'id,nome,preco,ean', limit: 8 };
 
-    const res = await api.get('/produtos/buscar', { params });
-    // Garante retorno de array mesmo se vier objeto único
+    const res = await comRetry(() => api.get('/produtos/buscar', { params }));
     return Array.isArray(res.data) ? res.data : (res.data ? [res.data] : []);
   } catch (err) {
-    console.error('Erro ao buscar produto:', err.message);
+    logger.error('Erro ao buscar produto', { termo, error: err.message });
     return [];
   }
 }
@@ -45,7 +61,7 @@ async function getProdutos() {
     const res = await api.get('/produtos/buscar', { params: { limit: 'all', campos: 'id,nome,preco,estoque' } });
     return Array.isArray(res.data) ? res.data : [];
   } catch (err) {
-    console.error('Erro ao listar produtos:', err.message);
+    logger.error('Erro ao listar produtos', { error: err.message });
     return [];
   }
 }
@@ -54,11 +70,11 @@ async function getProdutos() {
 // GET /produtos/:id/estoque  →  { "disponivel": true, "quantidade": 99999 }
 async function verificarEstoque(produtoId) {
   try {
-    const res = await api.get(`/produtos/${produtoId}/estoque`);
-    return res.data; // { disponivel: boolean, quantidade: number }
+    const res = await comRetry(() => api.get(`/produtos/${produtoId}/estoque`));
+    return res.data;
   } catch (err) {
     if (err.response?.status === 404 || err.response?.status === 400) return { disponivel: false, quantidade: 0 };
-    console.error('Erro ao verificar estoque:', err.message);
+    logger.error('Erro ao verificar estoque', { produtoId, error: err.message });
     return { disponivel: false, quantidade: 0 };
   }
 }
@@ -80,13 +96,13 @@ async function buscarCliente(identificador) {
       params = { nome: removerAcentos(identificador) }; // Nome parcial sem acentos
     }
 
-    const res = await api.get('/clientes/buscar', {
+    const res = await comRetry(() => api.get('/clientes/buscar', {
       params: { ...params, incluir_historico: true },
-    });
+    }));
     return res.data || null;
   } catch (err) {
     if (err.response?.status === 404) return null;
-    console.error('Erro ao buscar cliente:', err.message);
+    logger.error('Erro ao buscar cliente', { identificador, error: err.message });
     return null;
   }
 }
@@ -119,15 +135,14 @@ async function criarPedido(pedido) {
     };
 
     const res = await api.post('/pedidos', payload);
-    console.log(`✅ Pedido #${res.data.numero || res.data.id} criado no sistema`);
-    return res.data; // { id, numero, status, previsao_entrega }
+    logger.info(`Pedido criado no sistema`, { numero: res.data.numero || res.data.id });
+    return res.data;
   } catch (err) {
-    // Erro 400 = endereço fora de cobertura ou dados inválidos
     if (err.response?.status === 400) {
       const msg = err.response.data?.message || 'Endereço inválido ou fora de cobertura.';
       throw new Error(msg);
     }
-    console.error('Erro ao criar pedido:', err.response?.data || err.message);
+    logger.error('Erro ao criar pedido', { error: err.response?.data || err.message });
     throw new Error('Não foi possível registrar o pedido no sistema.');
   }
 }
@@ -136,7 +151,7 @@ async function criarPedido(pedido) {
 // GET /pedidos/ativos  →  { "ativos": 12 }
 async function consultarDemanda() {
   try {
-    const res = await api.get('/pedidos/ativos');
+    const res = await comRetry(() => api.get('/pedidos/ativos'));
     // API retorna array de pedidos ativos (ex: [{"id":"PED-52136"}, ...])
     const ativos = Array.isArray(res.data) ? res.data.length : (res.data?.ativos ?? 0);
 
@@ -149,7 +164,7 @@ async function consultarDemanda() {
 
     return { pedidosAtivos: ativos, tempoEstimado: minutos, demanda: descricao };
   } catch (err) {
-    console.error('Erro ao consultar demanda:', err.message);
+    logger.error('Erro ao consultar demanda', { error: err.message });
     return { pedidosAtivos: 0, tempoEstimado: 45, demanda: 'desconhecida' };
   }
 }
