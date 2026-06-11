@@ -44,7 +44,7 @@ async function enviarMensagem(para, texto) {
 
 // ─── Orquestra o fluxo de atendimento para mensagens de texto ───
 async function handleIncomingMessage(phone, texto) {
-  const session = getOrCreateSession(phone);
+  const session = await getOrCreateSession(phone);
 
   await enviarIndicadorDigitando(phone);
 

@@ -105,21 +105,20 @@ app.post('/chat', async (req, res) => {
   const { mensagem, telefone = 'teste_local' } = req.body;
   if (!mensagem) return res.status(400).json({ error: 'mensagem é obrigatória' });
 
-  const session = getOrCreateSession(telefone);
+  const session = await getOrCreateSession(telefone);
   try {
     const resposta = await processarMensagem(session, mensagem);
-    // Se retornar array (múltiplas mensagens), junta com separador visual
     const texto = Array.isArray(resposta) ? resposta.join('\n\n') : resposta;
     res.json({ resposta: texto });
   } catch (err) {
-    console.error('Erro no chat de teste:', err.message);
+    logger.error('Erro no chat de teste', { error: err.message });
     res.status(500).json({ error: err.message });
   }
 });
 
 // ─── Reinicia conversa de teste ───
-app.post('/nova-conversa', (req, res) => {
-  clearSession('teste_local');
+app.post('/nova-conversa', async (req, res) => {
+  await clearSession('teste_local');
   res.json({ ok: true });
 });
 

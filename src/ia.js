@@ -1,6 +1,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const apiModule = process.env.MOCK_MODE === 'true' ? require('./mockApi') : require('./sistemaApi');
 const { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente } = apiModule;
+const { saveSession, salvarConversa, salvarPedido } = require('./db');
 const logger = require('./logger');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -189,6 +190,18 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
         observacoes: inputs.observacoes,
       });
       session.step = 'done';
+
+      // Grava pedido no Supabase para histórico e métricas
+      salvarPedido({
+        phone: session.phone,
+        customerName: inputs.nome_cliente || session.customerName,
+        orderNumber: String(pedido.id || pedido.numero),
+        total,
+        formaPagamento: inputs.forma_pagamento,
+        endereco: inputs.endereco,
+        itens: inputs.itens,
+      }).catch(() => {}); // fire-and-forget, não bloqueia a resposta
+
       return `Pedido registrado com sucesso! Número: #${pedido.id || pedido.numero}. Total: R$ ${total.toFixed(2)}. Previsão de entrega: ${pedido.previsao_entrega || '30-50 minutos'}.`;
     } catch (err) {
       // Retorna o erro como resultado da ferramenta para a IA comunicar ao cliente
@@ -341,6 +354,10 @@ async function processarComIA(session, novaMensagem) {
     // Salva resposta da IA no histórico da sessão
     session.messages.push({ role: 'assistant', content: textoResposta });
     logger.debug(`Resposta da IA`, { phone: session.phone, chars: textoResposta.length });
+
+    // Persiste sessão no Redis e histórico no Supabase (fire-and-forget)
+    saveSession(session).catch(() => {});
+    salvarConversa(session).catch(() => {});
 
     return textoResposta;
   }
