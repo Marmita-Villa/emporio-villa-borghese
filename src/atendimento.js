@@ -33,15 +33,15 @@ _Exemplo:_
 Você aceita marcas similares? ( ) sim ou ( ) não.
 Agradecemos seu contato! 😊`;
 
-const BOAS_VINDAS_MAITHE = `Olá! Seja bem-vindo ao delivery do *Empório Villa Borghese*, eu sou a *Maithe*! 😊
+const BOAS_VINDAS_MAITHE = `Oi! Sou a *Maithe* do *Empório Villa Borghese* 😊
 
-Estamos com mais um canal de atendimento para realizar suas compras, através do nosso site www.emporiovillaborghese.com.br`;
+Me diz seu *nome*, *CPF* ou *telefone* que eu te encontro aqui no sistema e já começamos!`;
 
 const BOAS_VINDAS_HUMANO = `Olá! Seja bem-vindo ao delivery do *Empório Villa Borghese*! 😊
 
 Estamos com mais um canal de atendimento para realizar suas compras, através do nosso site www.emporiovillaborghese.com.br`;
 
-const NOVO_PEDIDO_MSG = `Que ótimo! 🛒 Para fazer um novo pedido, preencha o formulário abaixo:`;
+const NOVO_PEDIDO_MSG = `Que ótimo! 🛒 O que você quer pedir dessa vez?`;
 
 // ─── Roteador principal de atendimento ───
 async function processarMensagem(session, texto) {
@@ -60,7 +60,7 @@ async function processarMensagem(session, texto) {
 
     if (escolheuVirtual) {
       session.step = 'ai';
-      return [BOAS_VINDAS_MAITHE, FORM_MSG];
+      return BOAS_VINDAS_MAITHE;
     }
 
     if (escolheuHumano) {
@@ -101,7 +101,7 @@ async function processarMensagem(session, texto) {
       session.messages = [];
       session.cart = [];
       session.step = 'ai';
-      return [NOVO_PEDIDO_MSG, FORM_MSG];
+      return NOVO_PEDIDO_MSG;
     }
 
     return `Obrigada pela preferência! 😊 Se precisar de qualquer coisa, é só mandar mensagem que a gente te atende.\n\nAté a próxima! 👋`;
