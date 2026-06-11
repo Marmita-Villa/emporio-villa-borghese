@@ -57,7 +57,7 @@ async function verificarEstoque(produtoId) {
     const res = await api.get(`/produtos/${produtoId}/estoque`);
     return res.data; // { disponivel: boolean, quantidade: number }
   } catch (err) {
-    if (err.response?.status === 404) return { disponivel: false, quantidade: 0 };
+    if (err.response?.status === 404 || err.response?.status === 400) return { disponivel: false, quantidade: 0 };
     console.error('Erro ao verificar estoque:', err.message);
     return { disponivel: false, quantidade: 0 };
   }
@@ -137,7 +137,8 @@ async function criarPedido(pedido) {
 async function consultarDemanda() {
   try {
     const res = await api.get('/pedidos/ativos');
-    const ativos = res.data?.ativos ?? 0; // campo "ativos" conforme documentação
+    // API retorna array de pedidos ativos (ex: [{"id":"PED-52136"}, ...])
+    const ativos = Array.isArray(res.data) ? res.data.length : (res.data?.ativos ?? 0);
 
     let minutos, descricao;
     if (ativos <= 4)       { minutos = 30;  descricao = 'baixa'; }
