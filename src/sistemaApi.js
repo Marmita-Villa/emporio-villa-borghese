@@ -10,6 +10,11 @@ const api = axios.create({
   timeout: 10000,
 });
 
+// ─── Remove acentos para compatibilidade com a API (não suporta caracteres acentuados) ───
+function removerAcentos(texto) {
+  return texto.normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 // ─── Detecta se o termo é um código de barras EAN (8–13 dígitos numéricos) ───
 function pareceCodBarras(termo) {
   return /^\d{8,13}$/.test(termo.trim());
@@ -20,9 +25,10 @@ function pareceCodBarras(termo) {
 // Params: q (nome parcial), ean (código de barras), campos, limit, page
 async function buscarProduto(termo) {
   try {
-    const params = pareceCodBarras(termo.trim())
-      ? { ean: termo.trim(), campos: 'id,nome,preco,ean' }
-      : { q: termo.trim(), campos: 'id,nome,preco,ean', limit: 8 };
+    const termoLimpo = removerAcentos(termo.trim());
+    const params = pareceCodBarras(termoLimpo)
+      ? { ean: termoLimpo, campos: 'id,nome,preco,ean' }
+      : { q: termoLimpo, campos: 'id,nome,preco,ean', limit: 8 };
 
     const res = await api.get('/produtos/buscar', { params });
     // Garante retorno de array mesmo se vier objeto único
@@ -71,7 +77,7 @@ async function buscarCliente(identificador) {
     } else if (apenasNumeros.length >= 8) {
       params = { telefone: apenasNumeros };      // Telefone com DDD
     } else {
-      params = { nome: identificador };          // Nome parcial
+      params = { nome: removerAcentos(identificador) }; // Nome parcial sem acentos
     }
 
     const res = await api.get('/clientes/buscar', {
