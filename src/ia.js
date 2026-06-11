@@ -125,6 +125,7 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
 
     // Favoritos em oferta
     if (cliente.favoritos_em_oferta && cliente.favoritos_em_oferta.length > 0) {
+      session.currentOffers = cliente.favoritos_em_oferta;
       const ofertas = cliente.favoritos_em_oferta.map(f =>
         `${f.nome} (de R$ ${f.preco_normal.toFixed(2)} por R$ ${f.preco_oferta.toFixed(2)} — ${f.descricao_oferta})`
       ).join('; ');
@@ -190,6 +191,11 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
         observacoes: inputs.observacoes,
       });
       session.step = 'done';
+      session.converted = true;
+
+      // Detecta quais itens pedidos estavam em oferta
+      const offerNames = new Set((session.currentOffers || []).map(o => o.nome?.toLowerCase()));
+      const itensOferta = inputs.itens.filter(i => offerNames.has(i.nome?.toLowerCase()));
 
       // Grava pedido no Supabase para histórico e métricas
       salvarPedido({
@@ -200,6 +206,7 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
         formaPagamento: inputs.forma_pagamento,
         endereco: inputs.endereco,
         itens: inputs.itens,
+        itensOferta,
       }).catch(() => {}); // fire-and-forget, não bloqueia a resposta
 
       return `Pedido registrado com sucesso! Número: #${pedido.id || pedido.numero}. Total: R$ ${total.toFixed(2)}. Previsão de entrega: ${pedido.previsao_entrega || '30-50 minutos'}.`;

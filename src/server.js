@@ -101,6 +101,104 @@ app.post('/webhook', async (req, res) => {
 
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
+// ─── API do dashboard de relatórios ───
+app.get('/api/dashboard', async (req, res) => {
+  if (req.query.key !== process.env.DASHBOARD_KEY) return res.status(401).json({ error: 'Não autorizado' });
+
+  const { periodo = '30d', from: fromParam, to: toParam } = req.query;
+  const agora = new Date();
+  let fromDate, toDate = agora;
+
+  if (fromParam && toParam) {
+    fromDate = new Date(fromParam);
+    toDate = new Date(toParam + 'T23:59:59');
+  } else {
+    switch (periodo) {
+      case 'hoje': fromDate = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()); break;
+      case '7d':   fromDate = new Date(Date.now() - 7  * 86400000); break;
+      default:     fromDate = new Date(Date.now() - 30 * 86400000);
+    }
+  }
+
+  const { createClient } = require('@supabase/supabase-js');
+  const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+
+  const [ordersRes, convsRes] = await Promise.all([
+    sb.from('orders').select('*').gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
+    sb.from('conversations').select('phone,customer_name,step,converted,transferred_to_human,created_at,started_at,updated_at').gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
+  ]);
+
+  const orders = ordersRes.data || [];
+  const convs  = convsRes.data  || [];
+
+  // KPIs
+  const totalVendido      = orders.reduce((s, o) => s + (o.total || 0), 0);
+  const totalPedidos      = orders.length;
+  const ticketMedio       = totalPedidos > 0 ? totalVendido / totalPedidos : 0;
+  const totalAtendimentos = convs.length;
+  const convertidos       = convs.filter(c => c.converted).length;
+  const taxaConversao     = totalAtendimentos > 0 ? (convertidos / totalAtendimentos * 100) : 0;
+  const transf            = convs.filter(c => c.transferred_to_human).length;
+
+  // Top produtos
+  const prodMap = {};
+  for (const o of orders) {
+    for (const item of (o.itens || [])) {
+      if (!item.nome) continue;
+      prodMap[item.nome] = prodMap[item.nome] || { nome: item.nome, quantidade: 0, valor: 0 };
+      prodMap[item.nome].quantidade += item.quantidade || 1;
+      prodMap[item.nome].valor += (item.quantidade || 1) * (item.preco || 0);
+    }
+  }
+  const topProdutos = Object.values(prodMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 10);
+
+  // Top ofertas vendidas
+  const ofMap = {};
+  for (const o of orders) {
+    for (const item of (o.itens_oferta || [])) {
+      if (!item.nome) continue;
+      ofMap[item.nome] = ofMap[item.nome] || { nome: item.nome, quantidade: 0, valor: 0 };
+      ofMap[item.nome].quantidade += item.quantidade || 1;
+      ofMap[item.nome].valor += (item.quantidade || 1) * (item.preco || 0);
+    }
+  }
+  const topOfertas = Object.values(ofMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 10);
+
+  // Vendas por dia
+  const vendaDia = {};
+  for (const o of orders) {
+    const d = o.created_at.substring(0, 10);
+    vendaDia[d] = vendaDia[d] || { data: d, total: 0, pedidos: 0 };
+    vendaDia[d].total += o.total || 0;
+    vendaDia[d].pedidos++;
+  }
+
+  // Formas de pagamento
+  const pagamentos = {};
+  for (const o of orders) {
+    const fp = o.forma_pagamento || 'não informado';
+    pagamentos[fp] = (pagamentos[fp] || 0) + 1;
+  }
+
+  // Atendimentos por hora
+  const porHora = Array(24).fill(0);
+  for (const c of convs) { porHora[new Date(c.created_at).getHours()]++; }
+
+  res.json({
+    periodo: { from: fromDate, to: toDate },
+    kpis: { totalVendido, totalPedidos, ticketMedio, totalAtendimentos, taxaConversao, transferidosHumano: transf },
+    topProdutos,
+    topOfertas,
+    vendasPorDia: Object.values(vendaDia).sort((a, b) => a.data.localeCompare(b.data)),
+    pagamentos,
+    atendimentosPorHora: porHora,
+    ultimosPedidos: [...orders].reverse().slice(0, 20).map(o => ({
+      numero: o.order_number, cliente: o.customer_name, total: o.total,
+      forma_pagamento: o.forma_pagamento, created_at: o.created_at,
+    })),
+  });
+});
+
 // ─── Endpoint de teste local (sem WhatsApp) ───
 app.post('/chat', async (req, res) => {
   const { mensagem, telefone = 'teste_local' } = req.body;
@@ -124,7 +222,8 @@ app.post('/nova-conversa', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ─── Interface web de teste ───
+// ─── Rotas das interfaces web ───
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, '../public/dashboard.html')));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // ─── Monitor de sessões inativas (verifica a cada 2 minutos) ───

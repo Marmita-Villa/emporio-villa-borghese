@@ -65,6 +65,7 @@ async function processarMensagem(session, texto) {
 
     if (escolheuHumano) {
       session.step = 'humano';
+      session.transferredToHuman = true;
       logger.info(`Cliente solicitou atendente humano`, { phone: session.phone });
       return [BOAS_VINDAS_HUMANO, FORM_MSG];
     }

@@ -55,8 +55,12 @@ function createSessionObj(phone) {
     cart: [],
     step: 'menu',
     lastActivity: Date.now(),
+    startedAt: Date.now(),
     customerName: null,
     productCache: {},
+    currentOffers: [],
+    converted: false,
+    transferredToHuman: false,
   };
 }
 
@@ -93,6 +97,9 @@ async function salvarConversa(session) {
         customer_name: session.customerName,
         step: session.step,
         messages: session.messages,
+        started_at: session.startedAt ? new Date(session.startedAt).toISOString() : new Date().toISOString(),
+        converted: session.converted || false,
+        transferred_to_human: session.transferredToHuman || false,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'phone' });
 
@@ -102,7 +109,7 @@ async function salvarConversa(session) {
   }
 }
 
-async function salvarPedido({ phone, customerName, orderNumber, total, formaPagamento, endereco, itens }) {
+async function salvarPedido({ phone, customerName, orderNumber, total, formaPagamento, endereco, itens, itensOferta = [] }) {
   try {
     const { error } = await supabase
       .from('orders')
@@ -114,6 +121,7 @@ async function salvarPedido({ phone, customerName, orderNumber, total, formaPaga
         forma_pagamento: formaPagamento,
         endereco,
         itens,
+        itens_oferta: itensOferta,
       });
 
     if (error) logger.error('Supabase salvarPedido error', { error: error.message });
