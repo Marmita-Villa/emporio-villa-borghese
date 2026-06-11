@@ -22,7 +22,7 @@ const tools = [
   },
   {
     name: 'buscar_produtos',
-    description: 'Busca produtos no estoque por nome, marca, descrição, peso (ex: 500g, 1kg), volume (ex: 900ml, 2L) ou código de barras EAN13. Use para verificar o que tem disponível.',
+    description: 'Busca produtos por nome, marca, descrição, peso (ex: 500g, 1kg), volume (ex: 900ml, 2L) ou código de barras EAN13. Retorna apenas nome, preço e ID — NÃO retorna disponibilidade de estoque. Após buscar, você OBRIGATORIAMENTE deve chamar verificar_estoque para cada produto antes de confirmar ao cliente.',
     input_schema: {
       type: 'object',
       properties: {
@@ -33,7 +33,7 @@ const tools = [
   },
   {
     name: 'verificar_estoque',
-    description: 'Verifica se um produto específico tem estoque disponível e a quantidade.',
+    description: 'Verifica em tempo real se um produto tem estoque disponível. DEVE ser chamada obrigatoriamente para cada produto antes de confirmar disponibilidade ao cliente — nunca assuma que um produto está disponível sem chamar esta ferramenta.',
     input_schema: {
       type: 'object',
       properties: {
