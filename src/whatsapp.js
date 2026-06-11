@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { getOrCreateSession } = require('./session');
+const { saveSession } = require('./db');
 const { processarMensagem } = require('./atendimento');
 const logger = require('./logger');
 
@@ -50,6 +51,9 @@ async function handleIncomingMessage(phone, texto) {
 
   try {
     const resposta = await processarMensagem(session, texto);
+
+    // Persiste mudanças de step e dados do cliente no Redis
+    await saveSession(session);
 
     if (Array.isArray(resposta)) {
       for (const msg of resposta) {
