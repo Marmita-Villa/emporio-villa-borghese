@@ -5,7 +5,7 @@ const MENU_MSG = `Olá! 👋 Bem-vindo ao *Villa Borghese Empório*!
 
 Como prefere ser atendido?
 
-1️⃣ *Maithe* — Atendente virtual (disponível agora)
+1️⃣ *Maithe* — Atendente virtual por IA (disponível agora)
 2️⃣ *Atendente humano* — Um de nossa equipe vai te chamar
 
 Digite *1* ou *2*`;
@@ -33,7 +33,7 @@ _Exemplo:_
 Você aceita marcas similares? ( ) sim ou ( ) não.
 Agradecemos seu contato! 😊`;
 
-const BOAS_VINDAS_MAITHE = `Oi! Sou a *Maithe* do *Empório Villa Borghese* 😊
+const BOAS_VINDAS_MAITHE = `Oi! Sou a *Maithe*, atendente por IA do *Empório Villa Borghese* 🤖😊
 
 Me diz seu *nome*, *CPF* ou *telefone* que eu te encontro aqui no sistema e já começamos!`;
 
