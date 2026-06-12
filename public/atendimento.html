@@ -750,14 +750,14 @@
             <td style="padding:12px 16px">${c.assigned_name || '—'}</td>
             <td style="padding:12px 16px;color:#636e72;font-size:12px">${c.human_started_at ? fmtDt(c.human_started_at) : '—'}</td>
             <td style="padding:12px 16px;color:#636e72;font-size:12px">${c.human_ended_at ? fmtDt(c.human_ended_at) : '—'}</td>
-            <td style="padding:8px 16px"><button onclick="verConversa('${c.phone}','${(c.customer_name||'Cliente').replace(/'/g,"\\'")}' )" style="background:#075E54;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer">Ver</button></td>
+            <td style="padding:8px 16px"><button onclick="verConversa('${c.phone}','${(c.customer_name||'Cliente').replace(/'/g,"\\'")}','${c.human_started_at||''}')" style="background:var(--laranja);color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer">Ver</button></td>
           </tr>`).join('')}</tbody>
         </table>
       </div>`;
   }
 
   // ── Modal histórico de conversa ──
-  async function verConversa(phone, nome) {
+  async function verConversa(phone, nome, humanStartedAt) {
     document.getElementById('modal-nome').textContent = nome;
     document.getElementById('modal-phone').textContent = phone;
     document.getElementById('modal-msgs').innerHTML = '<div style="text-align:center;padding:24px;color:#b2bec3">Carregando...</div>';

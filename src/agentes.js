@@ -202,10 +202,28 @@ router.post('/conversa/:phone/tags', verificarToken, async (req, res) => {
 router.post('/conversa/:phone/encerrar', verificarToken, async (req, res) => {
   const { phone } = req.params;
   const sb = getSupabase();
+  const agora = new Date().toISOString();
+
+  // Busca dados da conversa antes de encerrar
+  const { data: conv } = await sb.from('conversations').select('*').eq('phone', phone).single();
+
+  // Grava no histórico permanente (nunca é sobrescrito por novas conversas)
+  if (conv) {
+    await sb.from('conversation_history').insert({
+      phone,
+      customer_name: conv.customer_name,
+      assigned_to: conv.assigned_to,
+      assigned_name: conv.assigned_name,
+      tags: conv.tags || [],
+      human_started_at: conv.human_started_at,
+      human_ended_at: agora,
+      encerrado_por: req.agente.nome,
+    });
+  }
 
   await sb.from('conversations').update({
     status: 'encerrado',
-    human_ended_at: new Date().toISOString(),
+    human_ended_at: agora,
   }).eq('phone', phone);
 
   await clearSession(phone);
@@ -218,15 +236,14 @@ router.post('/conversa/:phone/encerrar', verificarToken, async (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/historico — conversas encerradas recentes
+// GET /api/historico — conversas encerradas (tabela permanente)
 router.get('/historico', verificarToken, async (req, res) => {
   const sb = getSupabase();
   const { data } = await sb
-    .from('conversations')
-    .select('phone,customer_name,assigned_name,tags,human_started_at,human_ended_at,updated_at')
-    .eq('status', 'encerrado')
+    .from('conversation_history')
+    .select('phone,customer_name,assigned_name,tags,human_started_at,human_ended_at,encerrado_por')
     .order('human_ended_at', { ascending: false })
-    .limit(50);
+    .limit(100);
   res.json(data || []);
 });
 
