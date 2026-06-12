@@ -5,6 +5,7 @@ const { handleIncomingMessage, handleNonTextMessage, enviarMensagem } = require(
 const logger = require('./logger');
 const { getOrCreateSession, clearSession, verificarSessoesExpiradas } = require('./session');
 const { saveSession } = require('./db');
+const agentesRouter = require('./agentes');
 const { processarMensagem } = require('./atendimento');
 
 const app = express();
@@ -224,6 +225,8 @@ app.post('/nova-conversa', async (req, res) => {
 
 // ─── Rotas das interfaces web ───
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, '../public/dashboard.html')));
+app.get('/atendimento', (req, res) => res.sendFile(path.join(__dirname, '../public/atendimento.html')));
+app.use('/api', agentesRouter);
 app.use(express.static(path.join(__dirname, '../public')));
 
 // ─── Monitor de sessões inativas (verifica a cada 2 minutos) ───

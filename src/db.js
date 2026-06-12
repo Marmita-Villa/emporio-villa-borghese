@@ -88,6 +88,12 @@ async function clearSession(phone) {
 // HISTÓRICO — Supabase
 // ──────────────────────────────────────────
 
+function resolverStatus(session) {
+  if (session.converted) return 'encerrado';
+  if (session.transferredToHuman) return 'aguardando';
+  return 'bot';
+}
+
 async function salvarConversa(session) {
   try {
     const { error } = await supabase
@@ -100,6 +106,7 @@ async function salvarConversa(session) {
         started_at: session.startedAt ? new Date(session.startedAt).toISOString() : new Date().toISOString(),
         converted: session.converted || false,
         transferred_to_human: session.transferredToHuman || false,
+        status: resolverStatus(session),
         updated_at: new Date().toISOString(),
       }, { onConflict: 'phone' });
 
@@ -130,10 +137,19 @@ async function salvarPedido({ phone, customerName, orderNumber, total, formaPaga
   }
 }
 
+async function salvarMensagemHumana({ phone, direction, content }) {
+  try {
+    await supabase.from('human_messages').insert({ phone, direction, content });
+  } catch (err) {
+    logger.error('Erro ao salvar mensagem humana', { error: err.message });
+  }
+}
+
 module.exports = {
   getOrCreateSession,
   saveSession,
   clearSession,
   salvarConversa,
   salvarPedido,
+  salvarMensagemHumana,
 };

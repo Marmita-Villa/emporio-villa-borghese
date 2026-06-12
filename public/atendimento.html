@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Villa Borghese — Painel de Atendimento</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #2d3436; height: 100vh; overflow: hidden; }
+
+    /* ── Login ── */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; background: #075E54;
+    }
+    .login-box {
+      background: white; border-radius: 14px; padding: 40px 48px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.25); text-align: center; width: 360px;
+    }
+    .login-box img { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; margin-bottom: 16px; }
+    .login-box h2 { font-size: 20px; margin-bottom: 4px; }
+    .login-box p { color: #636e72; font-size: 13px; margin-bottom: 28px; }
+    .login-box input {
+      width: 100%; padding: 12px 14px; border: 1px solid #dfe6e9;
+      border-radius: 8px; font-size: 14px; margin-bottom: 12px; outline: none;
+    }
+    .login-box input:focus { border-color: #075E54; }
+    .login-box button {
+      width: 100%; padding: 13px; background: #075E54; color: white;
+      border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .login-box button:hover { background: #128C7E; }
+    .login-erro { color: #e17055; font-size: 13px; margin-top: 10px; }
+
+    /* ── App layout ── */
+    #app { display: none; height: 100vh; flex-direction: column; }
+
+    header {
+      background: #075E54; color: white; padding: 0 20px;
+      display: flex; align-items: center; gap: 12px; height: 56px; flex-shrink: 0;
+    }
+    header img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+    header h1 { font-size: 16px; font-weight: 700; flex: 1; }
+    .agent-badge { background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+    .btn-logout { background: none; border: none; color: rgba(255,255,255,0.7); cursor: pointer; font-size: 13px; padding: 6px 10px; border-radius: 6px; }
+    .btn-logout:hover { color: white; background: rgba(255,255,255,0.1); }
+
+    nav {
+      background: white; border-bottom: 1px solid #e0e0e0;
+      display: flex; gap: 0; flex-shrink: 0;
+    }
+    .nav-tab {
+      padding: 12px 20px; font-size: 13px; font-weight: 500; color: #636e72;
+      cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .nav-tab:hover { color: #075E54; }
+    .nav-tab.active { color: #075E54; border-bottom-color: #075E54; }
+    .badge-count { background: #e17055; color: white; border-radius: 10px; padding: 1px 6px; font-size: 11px; margin-left: 6px; }
+
+    .content { flex: 1; overflow: hidden; display: flex; }
+
+    /* ── Lista de conversas ── */
+    .conv-list { width: 320px; border-right: 1px solid #e0e0e0; background: white; display: flex; flex-direction: column; flex-shrink: 0; }
+    .conv-list-header { padding: 14px 16px; font-size: 12px; color: #636e72; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; border-bottom: 1px solid #f0f0f0; }
+    .conv-items { overflow-y: auto; flex: 1; }
+    .conv-item {
+      padding: 14px 16px; border-bottom: 1px solid #f5f5f5; cursor: pointer;
+      transition: background 0.1s; position: relative;
+    }
+    .conv-item:hover { background: #f8f9fa; }
+    .conv-item.active { background: #e8f5e9; }
+    .conv-item .name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+    .conv-item .phone { font-size: 12px; color: #636e72; margin-bottom: 3px; }
+    .conv-item .preview { font-size: 12px; color: #b2bec3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .conv-item .time { position: absolute; top: 14px; right: 14px; font-size: 11px; color: #b2bec3; }
+    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .status-dot.aguardando { background: #e17055; }
+    .status-dot.em_atendimento { background: #25D366; }
+    .status-dot.encerrado { background: #b2bec3; }
+    .empty-list { text-align: center; padding: 48px 20px; color: #b2bec3; font-size: 13px; }
+
+    /* ── Chat ── */
+    .chat-area { flex: 1; display: flex; flex-direction: column; background: #ECE5DD; }
+    .chat-empty { flex: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 12px; color: #b2bec3; }
+    .chat-empty span { font-size: 48px; }
+    .chat-empty p { font-size: 14px; }
+
+    .chat-header {
+      background: #075E54; color: white; padding: 12px 20px;
+      display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+    }
+    .chat-header .info h3 { font-size: 15px; font-weight: 600; }
+    .chat-header .info p { font-size: 12px; color: #B2DFDB; }
+    .chat-header .actions { margin-left: auto; display: flex; gap: 8px; }
+    .btn-assumir { background: #25D366; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-assumir:hover { background: #128C7E; }
+    .btn-encerrar { background: #e17055; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-encerrar:hover { background: #d63031; }
+
+    .messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .msg { max-width: 72%; padding: 8px 12px 4px; border-radius: 8px; font-size: 14px; line-height: 1.45; word-wrap: break-word; white-space: pre-wrap; }
+    .msg.bot { background: #fff; align-self: flex-start; border-radius: 8px 8px 8px 0; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+    .msg.client { background: #DCF8C6; align-self: flex-start; border-radius: 8px 8px 8px 0; }
+    .msg.agent { background: #075E54; color: white; align-self: flex-end; border-radius: 8px 8px 0 8px; }
+    .msg .msg-time { font-size: 10px; opacity: 0.6; text-align: right; margin-top: 3px; }
+    .msg .msg-label { font-size: 10px; opacity: 0.7; margin-bottom: 2px; font-weight: 600; }
+    .divider { text-align: center; font-size: 11px; color: #b2bec3; margin: 8px 0; background: rgba(0,0,0,0.05); border-radius: 8px; padding: 4px 12px; align-self: center; }
+
+    .input-area {
+      background: #f0f0f0; padding: 10px 12px; display: flex; gap: 10px; align-items: flex-end; flex-shrink: 0;
+    }
+    .input-area textarea {
+      flex: 1; padding: 10px 14px; border: none; border-radius: 22px; font-size: 14px;
+      outline: none; background: white; resize: none; max-height: 120px; line-height: 1.4; font-family: inherit;
+    }
+    .input-area button {
+      width: 44px; height: 44px; background: #25D366; color: white; border: none;
+      border-radius: 50%; cursor: pointer; font-size: 18px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .input-area button:hover { background: #128C7E; }
+    .input-area button:disabled { background: #ccc; cursor: not-allowed; }
+    .input-blocked { padding: 12px; text-align: center; color: #b2bec3; font-size: 13px; background: #f0f0f0; flex-shrink: 0; }
+
+    /* ── Admin: agentes ── */
+    .admin-panel { flex: 1; overflow-y: auto; padding: 24px; }
+    .admin-panel h2 { font-size: 18px; font-weight: 700; margin-bottom: 20px; }
+    .agent-form { background: white; border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .agent-form h3 { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .form-row input, .form-row select { padding: 10px 12px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 14px; outline: none; }
+    .form-row input:focus { border-color: #075E54; }
+    .btn-criar { background: #075E54; color: white; border: none; padding: 11px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .agents-table { background: white; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; }
+    .agents-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .agents-table th { padding: 12px 16px; text-align: left; color: #636e72; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #f0f0f0; }
+    .agents-table td { padding: 13px 16px; border-bottom: 1px solid #f8f9fa; }
+    .agents-table tr:last-child td { border: none; }
+    .toggle-btn { padding: 5px 12px; border-radius: 12px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .toggle-btn.ativo { background: #d4edda; color: #155724; }
+    .toggle-btn.inativo { background: #f8d7da; color: #721c24; }
+    .role-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .role-badge.admin { background: #e8d5fb; color: #6c5ce7; }
+    .role-badge.agent { background: #cce5ff; color: #004085; }
+
+    @media (max-width: 700px) {
+      .conv-list { width: 100%; border-right: none; }
+      .chat-area { display: none; }
+      .conv-list.hidden { display: none; }
+      .chat-area.show { display: flex; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login -->
+<div id="login-screen">
+  <div class="login-box">
+    <img src="/logo.png" alt="" onerror="this.style.display='none'">
+    <h2>Painel de Atendimento</h2>
+    <p>Villa Borghese Empório</p>
+    <input type="email" id="login-email" placeholder="Seu e-mail" autocomplete="email" />
+    <input type="password" id="login-senha" placeholder="Senha" />
+    <button onclick="fazerLogin()">Entrar</button>
+    <div class="login-erro" id="login-erro"></div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <header>
+    <img src="/logo.png" alt="" onerror="this.style.display='none'">
+    <h1>Atendimento</h1>
+    <span class="agent-badge" id="agent-nome"></span>
+    <button class="btn-logout" onclick="logout()">Sair</button>
+  </header>
+
+  <nav id="nav">
+    <div class="nav-tab active" data-tab="fila" onclick="mudarAba('fila')">
+      Fila <span class="badge-count" id="badge-fila" style="display:none"></span>
+    </div>
+    <div class="nav-tab" data-tab="minhas" onclick="mudarAba('minhas')">
+      Em atendimento <span class="badge-count" id="badge-minhas" style="display:none"></span>
+    </div>
+    <div class="nav-tab" data-tab="historico" onclick="mudarAba('historico')">Histórico</div>
+    <div class="nav-tab" data-tab="agentes" id="tab-agentes" style="display:none" onclick="mudarAba('agentes')">Agentes</div>
+  </nav>
+
+  <div class="content" id="content">
+    <!-- Fila e Em atendimento: lista + chat -->
+    <div id="view-fila" class="content" style="width:100%">
+      <div class="conv-list" id="conv-list">
+        <div class="conv-list-header" id="list-header">Aguardando atendimento</div>
+        <div class="conv-items" id="conv-items"></div>
+      </div>
+      <div class="chat-area" id="chat-area">
+        <div class="chat-empty" id="chat-empty">
+          <span>💬</span>
+          <p>Selecione uma conversa para atender</p>
+        </div>
+        <div id="chat-active" style="display:none; flex-direction:column; height:100%">
+          <div class="chat-header">
+            <div class="info">
+              <h3 id="chat-nome"></h3>
+              <p id="chat-phone"></p>
+            </div>
+            <div class="actions" id="chat-actions"></div>
+          </div>
+          <div class="messages-area" id="messages-area"></div>
+          <div id="input-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Histórico -->
+    <div id="view-historico" style="display:none; flex:1; overflow-y:auto; padding:24px">
+      <div id="historico-content"></div>
+    </div>
+
+    <!-- Agentes (admin) -->
+    <div id="view-agentes" style="display:none; flex:1">
+      <div class="admin-panel">
+        <h2>Gestão de Agentes</h2>
+        <div class="agent-form">
+          <h3>Novo Agente</h3>
+          <div class="form-row">
+            <input type="text" id="f-nome" placeholder="Nome completo" />
+            <input type="email" id="f-email" placeholder="E-mail" />
+          </div>
+          <div class="form-row">
+            <input type="password" id="f-senha" placeholder="Senha" />
+            <select id="f-role">
+              <option value="agent">Atendente</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <button class="btn-criar" onclick="criarAgente()">Criar Agente</button>
+          <div id="agente-msg" style="margin-top:10px;font-size:13px"></div>
+        </div>
+        <div class="agents-table">
+          <table>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ação</th></tr></thead>
+            <tbody id="agents-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let token = localStorage.getItem('vb_token');
+  let agente = null;
+  let abaAtual = 'fila';
+  let phoneAtivo = null;
+  let pollingInterval = null;
+  let chatPollingInterval = null;
+  let ultimaMsgId = null;
+
+  // ── Init ──
+  window.addEventListener('load', () => {
+    document.getElementById('login-senha').addEventListener('keydown', e => { if (e.key === 'Enter') fazerLogin(); });
+    if (token) verificarToken();
+  });
+
+  async function verificarToken() {
+    const res = await api('/auth/me');
+    if (res.error) { token = null; localStorage.removeItem('vb_token'); return; }
+    agente = res;
+    iniciarApp();
+  }
+
+  async function fazerLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const senha = document.getElementById('login-senha').value;
+    if (!email || !senha) return;
+    const res = await fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, senha }),
+    });
+    const data = await res.json();
+    if (!res.ok) { document.getElementById('login-erro').textContent = data.error; return; }
+    token = data.token;
+    agente = data.agente;
+    localStorage.setItem('vb_token', token);
+    iniciarApp();
+  }
+
+  function logout() {
+    localStorage.removeItem('vb_token');
+    token = null; agente = null;
+    location.reload();
+  }
+
+  function iniciarApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('agent-nome').textContent = agente.nome;
+    if (agente.role === 'admin') document.getElementById('tab-agentes').style.display = 'block';
+    mudarAba('fila');
+    iniciarPolling();
+  }
+
+  // ── API helper ──
+  async function api(path, opts = {}) {
+    const res = await fetch('/api' + path, {
+      ...opts,
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    });
+    if (res.status === 401) { logout(); return {}; }
+    return await res.json();
+  }
+
+  // ── Navegação ──
+  function mudarAba(aba) {
+    abaAtual = aba;
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === aba));
+    document.getElementById('view-fila').style.display = (aba === 'fila' || aba === 'minhas') ? 'flex' : 'none';
+    document.getElementById('view-historico').style.display = aba === 'historico' ? 'flex' : 'none';
+    document.getElementById('view-agentes').style.display = aba === 'agentes' ? 'flex' : 'none';
+
+    if (aba === 'fila' || aba === 'minhas') carregarFila();
+    if (aba === 'historico') carregarHistorico();
+    if (aba === 'agentes') carregarAgentes();
+
+    fecharChat();
+  }
+
+  // ── Polling ──
+  function iniciarPolling() {
+    pollingInterval = setInterval(() => { if (abaAtual === 'fila' || abaAtual === 'minhas') carregarFila(); }, 5000);
+  }
+
+  function iniciarChatPolling(phone) {
+    clearInterval(chatPollingInterval);
+    chatPollingInterval = setInterval(() => carregarMensagens(phone), 3000);
+  }
+
+  // ── Fila ──
+  async function carregarFila() {
+    const data = await api('/fila');
+    if (!data || !Array.isArray(data)) return;
+
+    const aguardando = data.filter(c => c.status === 'aguardando');
+    const emAtendimento = data.filter(c => c.status === 'em_atendimento');
+    const minhas = emAtendimento.filter(c => c.assigned_name === agente.nome);
+
+    // Badges
+    const bFila = document.getElementById('badge-fila');
+    bFila.textContent = aguardando.length;
+    bFila.style.display = aguardando.length ? 'inline' : 'none';
+    const bMinhas = document.getElementById('badge-minhas');
+    bMinhas.textContent = minhas.length;
+    bMinhas.style.display = minhas.length ? 'inline' : 'none';
+
+    const lista = abaAtual === 'fila' ? aguardando : minhas;
+    document.getElementById('list-header').textContent =
+      abaAtual === 'fila' ? 'Aguardando atendimento' : 'Minhas conversas ativas';
+
+    const container = document.getElementById('conv-items');
+    if (!lista.length) {
+      container.innerHTML = `<div class="empty-list">${abaAtual === 'fila' ? '✅ Nenhuma conversa na fila' : '😊 Nenhuma conversa ativa'}</div>`;
+      return;
+    }
+
+    container.innerHTML = lista.map(c => `
+      <div class="conv-item ${phoneAtivo === c.phone ? 'active' : ''}" onclick="abrirConversa('${c.phone}', '${(c.customer_name || 'Cliente').replace(/'/g, "\\'")}')">
+        <div class="name"><span class="status-dot ${c.status}"></span>${c.customer_name || 'Cliente'}</div>
+        <div class="phone">${c.phone}</div>
+        <div class="preview">${c.assigned_name ? '👤 ' + c.assigned_name : '⏳ Aguardando'}</div>
+        <div class="time">${tempoRelativo(c.updated_at)}</div>
+      </div>
+    `).join('');
+  }
+
+  // ── Conversa ──
+  async function abrirConversa(phone, nome) {
+    phoneAtivo = phone;
+    document.getElementById('chat-empty').style.display = 'none';
+    document.getElementById('chat-active').style.display = 'flex';
+    document.getElementById('chat-nome').textContent = nome;
+    document.getElementById('chat-phone').textContent = phone;
+    document.getElementById('messages-area').innerHTML = '<div style="text-align:center;padding:20px;color:#b2bec3">Carregando...</div>';
+
+    await carregarFila(); // atualiza active no item
+    await carregarMensagens(phone);
+    iniciarChatPolling(phone);
+  }
+
+  async function carregarMensagens(phone) {
+    const data = await api(`/conversa/${phone}/historico`);
+    if (!data || !data.conversa) return;
+
+    const { conversa, botMessages, humanMessages } = data;
+    const area = document.getElementById('messages-area');
+    const actions = document.getElementById('chat-actions');
+    const inputContainer = document.getElementById('input-container');
+    const scrollBottom = area.scrollHeight - area.scrollTop === area.clientHeight;
+
+    // Botões de ação
+    if (conversa.status === 'aguardando') {
+      actions.innerHTML = `<button class="btn-assumir" onclick="assumirConversa('${phone}')">✋ Assumir</button>`;
+      inputContainer.innerHTML = `<div class="input-blocked">Assuma a conversa para responder</div>`;
+    } else if (conversa.status === 'em_atendimento' && conversa.assigned_name === agente.nome) {
+      actions.innerHTML = `<button class="btn-encerrar" onclick="encerrarConversa('${phone}')">✅ Encerrar</button>`;
+      inputContainer.innerHTML = `
+        <div class="input-area">
+          <textarea id="msg-input" placeholder="Digite sua mensagem..." rows="1"
+            oninput="autoResize(this)"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensagem('${phone}')}"></textarea>
+          <button onclick="enviarMensagem('${phone}')">&#9658;</button>
+        </div>`;
+    } else if (conversa.status === 'em_atendimento') {
+      actions.innerHTML = '';
+      inputContainer.innerHTML = `<div class="input-blocked">Em atendimento com ${conversa.assigned_name}</div>`;
+    } else {
+      actions.innerHTML = '';
+      inputContainer.innerHTML = `<div class="input-blocked">Conversa encerrada</div>`;
+    }
+
+    // Mensagens
+    let html = '<div class="divider">— Histórico do bot —</div>';
+    for (const msg of botMessages) {
+      const classe = msg.role === 'user' ? 'client' : 'bot';
+      const label = msg.role === 'user' ? '👤 Cliente' : '🤖 Maithe';
+      html += `<div class="msg ${classe}"><div class="msg-label">${label}</div>${esc(msg.content)}</div>`;
+    }
+
+    if (humanMessages.length) {
+      html += '<div class="divider">— Atendimento humano —</div>';
+      for (const msg of humanMessages) {
+        const classe = msg.direction === 'out' ? 'agent' : 'client';
+        const label = msg.direction === 'out' ? `👤 ${msg.agent_name}` : '👤 Cliente';
+        html += `<div class="msg ${classe}"><div class="msg-label">${label}</div>${esc(msg.content)}<div class="msg-time">${hora(msg.created_at)}</div></div>`;
+      }
+    }
+
+    area.innerHTML = html;
+    if (scrollBottom || area.scrollHeight - area.scrollTop < area.clientHeight + 200) {
+      area.scrollTop = area.scrollHeight;
+    }
+  }
+
+  async function assumirConversa(phone) {
+    const res = await api(`/conversa/${phone}/assumir`, { method: 'POST' });
+    if (res.error) { alert(res.error); return; }
+    await carregarMensagens(phone);
+    await carregarFila();
+  }
+
+  async function enviarMensagem(phone) {
+    const input = document.getElementById('msg-input');
+    const texto = input?.value.trim();
+    if (!texto) return;
+    input.value = '';
+    input.style.height = '';
+    const res = await api(`/conversa/${phone}/mensagem`, { method: 'POST', body: JSON.stringify({ texto }) });
+    if (res.error) { alert('Erro ao enviar: ' + res.error); return; }
+    await carregarMensagens(phone);
+  }
+
+  async function encerrarConversa(phone) {
+    if (!confirm('Encerrar esta conversa?')) return;
+    clearInterval(chatPollingInterval);
+    await api(`/conversa/${phone}/encerrar`, { method: 'POST' });
+    fecharChat();
+    await carregarFila();
+  }
+
+  function fecharChat() {
+    phoneAtivo = null;
+    clearInterval(chatPollingInterval);
+    document.getElementById('chat-empty').style.display = 'flex';
+    document.getElementById('chat-active').style.display = 'none';
+  }
+
+  // ── Histórico ──
+  async function carregarHistorico() {
+    const data = await api('/historico');
+    const el = document.getElementById('historico-content');
+    if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:48px;color:#b2bec3">Nenhuma conversa encerrada ainda</div>'; return; }
+    el.innerHTML = `
+      <div style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden">
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead><tr style="border-bottom:1px solid #f0f0f0">
+            <th style="padding:12px 16px;text-align:left;color:#636e72;font-size:11px;text-transform:uppercase">Cliente</th>
+            <th style="padding:12px 16px;text-align:left;color:#636e72;font-size:11px;text-transform:uppercase">Telefone</th>
+            <th style="padding:12px 16px;text-align:left;color:#636e72;font-size:11px;text-transform:uppercase">Atendente</th>
+            <th style="padding:12px 16px;text-align:left;color:#636e72;font-size:11px;text-transform:uppercase">Início</th>
+            <th style="padding:12px 16px;text-align:left;color:#636e72;font-size:11px;text-transform:uppercase">Encerrado</th>
+          </tr></thead>
+          <tbody>${data.map(c => `<tr style="border-bottom:1px solid #f8f9fa">
+            <td style="padding:12px 16px;font-weight:600">${c.customer_name || '—'}</td>
+            <td style="padding:12px 16px;color:#636e72">${c.phone}</td>
+            <td style="padding:12px 16px">${c.assigned_name || '—'}</td>
+            <td style="padding:12px 16px;color:#636e72;font-size:12px">${c.human_started_at ? fmtDt(c.human_started_at) : '—'}</td>
+            <td style="padding:12px 16px;color:#636e72;font-size:12px">${c.human_ended_at ? fmtDt(c.human_ended_at) : '—'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── Admin: Agentes ──
+  async function carregarAgentes() {
+    const data = await api('/agentes');
+    if (!Array.isArray(data)) return;
+    document.getElementById('agents-tbody').innerHTML = data.map(a => `
+      <tr>
+        <td style="font-weight:600">${a.nome}</td>
+        <td style="color:#636e72">${a.email}</td>
+        <td><span class="role-badge ${a.role}">${a.role === 'admin' ? 'Admin' : 'Atendente'}</span></td>
+        <td><span class="toggle-btn ${a.ativo ? 'ativo' : 'inativo'}">${a.ativo ? 'Ativo' : 'Inativo'}</span></td>
+        <td>
+          <button class="toggle-btn ${a.ativo ? 'inativo' : 'ativo'}" onclick="toggleAgente('${a.id}', ${!a.ativo})">
+            ${a.ativo ? 'Desativar' : 'Ativar'}
+          </button>
+        </td>
+      </tr>`).join('');
+  }
+
+  async function criarAgente() {
+    const nome  = document.getElementById('f-nome').value.trim();
+    const email = document.getElementById('f-email').value.trim();
+    const senha = document.getElementById('f-senha').value;
+    const role  = document.getElementById('f-role').value;
+    const msg   = document.getElementById('agente-msg');
+    if (!nome || !email || !senha) { msg.style.color = '#e17055'; msg.textContent = 'Preencha todos os campos'; return; }
+    const res = await api('/agentes', { method: 'POST', body: JSON.stringify({ nome, email, senha, role }) });
+    if (res.error) { msg.style.color = '#e17055'; msg.textContent = res.error; return; }
+    msg.style.color = '#00b894'; msg.textContent = 'Agente criado com sucesso!';
+    document.getElementById('f-nome').value = '';
+    document.getElementById('f-email').value = '';
+    document.getElementById('f-senha').value = '';
+    await carregarAgentes();
+  }
+
+  async function toggleAgente(id, ativo) {
+    await api(`/agentes/${id}`, { method: 'PATCH', body: JSON.stringify({ ativo }) });
+    await carregarAgentes();
+  }
+
+  // ── Helpers ──
+  function esc(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*(.*?)\*/g,'<strong>$1</strong>'); }
+  function hora(d) { return new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+  function fmtDt(d) { return new Date(d).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }); }
+  function tempoRelativo(d) {
+    const diff = Date.now() - new Date(d).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'agora';
+    if (m < 60) return m + 'min';
+    return Math.floor(m/60) + 'h';
+  }
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+</script>
+</body>
+</html>
