@@ -48,7 +48,7 @@ const tools = [
     input_schema: {
       type: 'object',
       properties: {
-        produto_id: { type: 'string', description: 'ID do produto' },
+        produto_id: { type: 'string', description: 'ID exato retornado pelo buscar_produtos. NUNCA invente ou deduza o ID — use SOMENTE o ID recebido na resposta da busca.' },
         produto_nome: { type: 'string', description: 'Nome do produto para exibir ao cliente' },
       },
       required: ['produto_id', 'produto_nome'],

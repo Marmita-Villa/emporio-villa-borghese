@@ -95,8 +95,8 @@ async function verificarEstoque(produtoId) {
     cacheSet(chave, res.data);
     return res.data;
   } catch (err) {
-    if (err.response?.status === 404 || err.response?.status === 400) return { disponivel: false, quantidade: 0 };
-    logger.error('Erro ao verificar estoque', { produtoId, error: err.message });
+    // Qualquer erro (timeout, 400, 404) → assume disponível para não bloquear venda
+    logger.warn('verificar_estoque falhou, assumindo disponível', { produtoId, status: err.response?.status, error: err.message });
     return { disponivel: true, quantidade: -1, erro: true };
   }
 }
