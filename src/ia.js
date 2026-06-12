@@ -226,7 +226,7 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
         itens: itensCorrigidos,
         total,
         formaPagamento: inputs.forma_pagamento,
-        observacoes: inputs.observacoes,
+        observacoes: [inputs.observacoes, 'FEITO PELO BOT AI'].filter(Boolean).join(' | '),
       });
       session.step = 'done';
       session.converted = true;
