@@ -6,6 +6,16 @@ const logger = require('./logger');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// ─── Cache de demanda (TTL 3 min) para evitar chamada à API a cada mensagem ───
+let _demandaCache = null;
+let _demandaCacheTs = 0;
+async function consultarDemandaCached() {
+  if (_demandaCache && Date.now() - _demandaCacheTs < 3 * 60 * 1000) return _demandaCache;
+  _demandaCache = await consultarDemanda();
+  _demandaCacheTs = Date.now();
+  return _demandaCache;
+}
+
 // ─── Ferramentas disponíveis para a IA ───
 const tools = [
   {
@@ -178,7 +188,7 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
   }
 
   if (nomeFerramenta === 'verificar_tempo_entrega') {
-    const demanda = await consultarDemanda();
+    const demanda = await consultarDemandaCached();
     const msgs = {
       baixa: 'Estamos tranquilos agora',
       moderada: 'Temos um movimento moderado',
@@ -360,8 +370,8 @@ async function processarComIA(session, novaMensagem) {
   // Loop de ferramenta: a IA pode chamar várias ferramentas antes de responder
   while (true) {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-5',
-      max_tokens: 2048,
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 600,
       system: getSystemPrompt(),
       tools,
       messages,
