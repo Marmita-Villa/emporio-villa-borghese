@@ -599,11 +599,32 @@
     }
 
     if (humanMessages.length) {
-      html += '<div class="divider">— Atendimento humano —</div>';
-      for (const msg of humanMessages) {
-        const classe = msg.direction === 'out' ? 'agent' : 'client';
-        const label = msg.direction === 'out' ? `👤 ${msg.agent_name}` : '👤 Cliente';
-        html += `<div class="msg ${classe}"><div class="msg-label">${label}</div>${esc(msg.content)}<div class="msg-time">${hora(msg.created_at)}</div></div>`;
+      // Agrupa mensagens por sessão — divide quando há gap de mais de 1h entre mensagens
+      const sessoes = [];
+      let sessaoAtual = [];
+      for (let i = 0; i < humanMessages.length; i++) {
+        if (i === 0) { sessaoAtual.push(humanMessages[i]); continue; }
+        const gap = new Date(humanMessages[i].created_at) - new Date(humanMessages[i-1].created_at);
+        if (gap > 60 * 60 * 1000) { sessoes.push(sessaoAtual); sessaoAtual = []; }
+        sessaoAtual.push(humanMessages[i]);
+      }
+      sessoes.push(sessaoAtual);
+
+      const sessaoAtiva = conversa.human_started_at;
+      for (let s = 0; s < sessoes.length; s++) {
+        const primeira = sessoes[s][0];
+        const ehAtual = sessaoAtiva && new Date(primeira.created_at) >= new Date(sessaoAtiva);
+        const dataLabel = fmtDt(primeira.created_at);
+        if (s < sessoes.length - 1) {
+          html += `<div class="divider">— Atendimento ${dataLabel} —</div>`;
+        } else {
+          html += `<div class="divider">— Atendimento humano ${ehAtual ? '(atual)' : dataLabel} —</div>`;
+        }
+        for (const msg of sessoes[s]) {
+          const classe = msg.direction === 'out' ? 'agent' : 'client';
+          const label = msg.direction === 'out' ? `👤 ${msg.agent_name}` : '👤 Cliente';
+          html += `<div class="msg ${classe}"><div class="msg-label">${label}</div>${esc(msg.content)}<div class="msg-time">${hora(msg.created_at)}</div></div>`;
+        }
       }
     }
 

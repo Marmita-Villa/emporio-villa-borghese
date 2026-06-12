@@ -152,10 +152,8 @@ router.get('/conversa/:phone/historico', verificarToken, async (req, res) => {
   const convRes = await sb.from('conversations').select('*').eq('phone', phone).single();
   const conv = convRes.data;
 
-  // Filtra mensagens humanas apenas da sessão atual (a partir de human_started_at)
-  let msgsQuery = sb.from('human_messages').select('*').eq('phone', phone).order('created_at');
-  if (conv?.human_started_at) msgsQuery = msgsQuery.gte('created_at', conv.human_started_at);
-  const msgsRes = await msgsQuery;
+  // Busca todo o histórico humano do número (exibido com divisores por sessão no frontend)
+  const msgsRes = await sb.from('human_messages').select('*').eq('phone', phone).order('created_at');
 
   res.json({
     conversa: conv || null,
