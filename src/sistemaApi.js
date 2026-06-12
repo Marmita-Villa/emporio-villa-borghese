@@ -8,8 +8,18 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${process.env.SISTEMA_API_TOKEN}`,
   },
-  timeout: 5000,
+  timeout: 3000,
 });
+
+// ─── Cache simples em memória (TTL 5 min) ───
+const _cache = new Map();
+function cacheGet(key) {
+  const entry = _cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > 5 * 60 * 1000) { _cache.delete(key); return null; }
+  return entry.val;
+}
+function cacheSet(key, val) { _cache.set(key, { val, ts: Date.now() }); }
 
 // ─── Remove acentos para compatibilidade com a API (não suporta caracteres acentuados) ───
 function removerAcentos(texto) {
@@ -41,6 +51,9 @@ function pareceCodBarras(termo) {
 // GET /produtos/buscar
 // Params: q (nome parcial), ean (código de barras), campos, limit, page
 async function buscarProduto(termo) {
+  const chave = `prod:${removerAcentos(termo.trim().toLowerCase())}`;
+  const cached = cacheGet(chave);
+  if (cached) return cached;
   try {
     const termoLimpo = removerAcentos(termo.trim());
     const params = pareceCodBarras(termoLimpo)
@@ -48,7 +61,9 @@ async function buscarProduto(termo) {
       : { q: termoLimpo, campos: 'id,nome,preco,ean', limit: 8 };
 
     const res = await comRetry(() => api.get('/produtos/buscar', { params }));
-    return Array.isArray(res.data) ? res.data : (res.data ? [res.data] : []);
+    const result = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : []);
+    cacheSet(chave, result);
+    return result;
   } catch (err) {
     logger.error('Erro ao buscar produto', { termo, error: err.message });
     return [];
@@ -69,12 +84,15 @@ async function getProdutos() {
 // ─── A.2 — Verifica estoque de um produto específico ───
 // GET /produtos/:id/estoque  →  { "disponivel": true, "quantidade": 99999 }
 async function verificarEstoque(produtoId) {
+  const chave = `estoque:${produtoId}`;
+  const cached = cacheGet(chave);
+  if (cached) return cached;
   try {
-    const res = await comRetry(() => api.get(`/produtos/${produtoId}/estoque`));
+    const res = await api.get(`/produtos/${produtoId}/estoque`, { timeout: 2500 });
+    cacheSet(chave, res.data);
     return res.data;
   } catch (err) {
     if (err.response?.status === 404 || err.response?.status === 400) return { disponivel: false, quantidade: 0 };
-    // Timeout ou erro de rede — não assumir sem estoque, pode ser falso negativo
     logger.error('Erro ao verificar estoque', { produtoId, error: err.message });
     return { disponivel: true, quantidade: -1, erro: true };
   }

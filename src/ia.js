@@ -33,7 +33,7 @@ const tools = [
   },
   {
     name: 'buscar_produtos',
-    description: 'Busca produtos por nome, marca, descrição, peso (ex: 500g, 1kg), volume (ex: 900ml, 2L) ou código de barras EAN13. Retorna apenas nome, preço e ID — NÃO retorna disponibilidade de estoque. Após buscar, você OBRIGATORIAMENTE deve chamar verificar_estoque para cada produto antes de confirmar ao cliente.',
+    description: 'Busca produtos por nome, marca, descrição, peso (ex: 500g, 1kg), volume (ex: 900ml, 2L) ou código de barras EAN13. Retorna nome, preço e ID. Use verificar_estoque SOMENTE se o cliente perguntar explicitamente se o produto está disponível ou em estoque — não chame por padrão.',
     input_schema: {
       type: 'object',
       properties: {
@@ -44,7 +44,7 @@ const tools = [
   },
   {
     name: 'verificar_estoque',
-    description: 'Verifica em tempo real se um produto tem estoque disponível. DEVE ser chamada obrigatoriamente para cada produto antes de confirmar disponibilidade ao cliente — nunca assuma que um produto está disponível sem chamar esta ferramenta. Se precisar verificar múltiplos produtos, chame verificar_estoque várias vezes na mesma resposta — elas serão executadas em paralelo.',
+    description: 'Verifica se um produto tem estoque disponível. Use SOMENTE quando o cliente perguntar explicitamente sobre disponibilidade ou estoque de um produto específico.',
     input_schema: {
       type: 'object',
       properties: {
@@ -163,7 +163,7 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
     const lista = produtos.slice(0, 8).map(p =>
       `• ${p.nome} — R$ ${p.preco.toFixed(2)} (ID: ${p.id})`
     ).join('\n');
-    const result = `Produtos encontrados:\n${lista}\n\nUse verificar_estoque para confirmar disponibilidade antes de oferecer ao cliente.`;
+    const result = `Produtos encontrados:\n${lista}`;
 
     if (session.productCache) session.productCache[chave] = { result, ts: Date.now() };
 
