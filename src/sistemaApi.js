@@ -122,11 +122,20 @@ async function buscarCliente(identificador) {
 // produto_id pode ser o objectId do Parse, SKU ou EAN
 // Retorno: { id, numero, status: "recebido", previsao_entrega }
 // Erro 400 se CEP não atendido: { status: 400, message: "Erro no endereço: Não entregamos para essa região." }
+async function normalizarTelefone(tel) {
+  const nums = String(tel || '').replace(/\D/g, '');
+  // Remove código do país 55 se tiver 13 dígitos (ex: 5513991765890 → 13991765890)
+  if (nums.length === 13 && nums.startsWith('55')) return nums.slice(2);
+  // Remove 0 inicial se tiver 12 dígitos
+  if (nums.length === 12 && nums.startsWith('0')) return nums.slice(1);
+  return nums;
+}
+
 async function criarPedido(pedido) {
   try {
     const payload = {
       cliente: {
-        telefone: pedido.telefone,
+        telefone: normalizarTelefone(pedido.telefone),
         nome: pedido.nomeCliente,
         endereco: pedido.endereco, // "Rua, Número, Bairro, Cidade/UF, CEP"
       },
