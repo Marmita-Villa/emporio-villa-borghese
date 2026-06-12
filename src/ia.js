@@ -98,8 +98,9 @@ async function executarFerramenta(nomeFerramenta, inputs, session) {
   logger.info(`IA chamou ferramenta: ${nomeFerramenta}`, inputs);
 
   if (nomeFerramenta === 'buscar_cliente') {
-    // Coleta todos os identificadores únicos fornecidos pela IA
-    const ids = [...new Set([inputs.cpf, inputs.telefone, inputs.nome].filter(Boolean))];
+    // Coleta todos os identificadores únicos — inclui telefone do WhatsApp como fallback
+    const whatsappPhone = session.phone && session.phone !== 'teste_local' ? session.phone : null;
+    const ids = [...new Set([inputs.cpf, inputs.telefone, inputs.nome, whatsappPhone].filter(Boolean))];
     let cliente = null;
     for (const id of ids) {
       cliente = await buscarCliente(id);
