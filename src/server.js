@@ -4,7 +4,7 @@ const path = require('path');
 const { handleIncomingMessage, handleNonTextMessage, enviarMensagem } = require('./whatsapp');
 const logger = require('./logger');
 const { getOrCreateSession, clearSession, verificarSessoesExpiradas } = require('./session');
-const { saveSession } = require('./db');
+const { saveSession, salvarConversa } = require('./db');
 const agentesRouter = require('./agentes');
 const { processarMensagem } = require('./atendimento');
 
@@ -209,6 +209,7 @@ app.post('/chat', async (req, res) => {
   try {
     const resposta = await processarMensagem(session, mensagem);
     await saveSession(session);
+    salvarConversa(session).catch(() => {});
     const texto = Array.isArray(resposta) ? resposta.join('\n\n') : resposta;
     res.json({ resposta: texto });
   } catch (err) {
