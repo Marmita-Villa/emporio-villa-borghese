@@ -85,6 +85,7 @@ const tools = [
         endereco: { type: 'string', description: 'Endereço de entrega do cliente' },
         forma_pagamento: { type: 'string', description: 'Forma de pagamento: dinheiro, pix, cartão' },
         nome_cliente: { type: 'string', description: 'Nome do cliente' },
+        telefone: { type: 'string', description: 'Telefone do cliente com DDD (ex: 13991765890). Obrigatório se não encontrado no cadastro.' },
         observacoes: { type: 'string', description: 'Observações adicionais do pedido' },
       },
       required: ['itens', 'endereco', 'forma_pagamento'],
@@ -107,8 +108,9 @@ async function executarFerramenta(nomeFerramenta, inputs, session) {
     if (!cliente) {
       return `Cliente não encontrado no cadastro. Tratar como novo cliente.`;
     }
-    // Salva nome na sessão para uso no pedido
+    // Salva dados do cliente na sessão para uso no pedido
     session.customerName = cliente.nome;
+    if (cliente.telefone) session.customerPhone = cliente.telefone;
     const vezes = cliente.total_pedidos || 0;
     const perfil = vezes >= 10 ? 'fiel e muito frequente' : vezes >= 3 ? 'recorrente' : vezes > 0 ? 'já comprou antes' : 'novo';
 
@@ -203,8 +205,9 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
   if (nomeFerramenta === 'finalizar_pedido') {
     const total = inputs.itens.reduce((sum, i) => sum + (i.preco * i.quantidade), 0);
     try {
+      const telefone = inputs.telefone || session.customerPhone || session.phone;
       const pedido = await criarPedido({
-        telefone: session.phone,
+        telefone,
         nomeCliente: inputs.nome_cliente || session.customerName || 'Cliente WhatsApp',
         endereco: inputs.endereco,
         itens: inputs.itens,
