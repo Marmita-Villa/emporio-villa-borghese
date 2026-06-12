@@ -203,14 +203,26 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
   }
 
   if (nomeFerramenta === 'finalizar_pedido') {
-    const total = inputs.itens.reduce((sum, i) => sum + (i.preco * i.quantidade), 0);
+    // Corrige IDs inventados usando o productMap da sessão (busca por nome do item)
+    const map = session.productMap || {};
+    const itensCorrigidos = inputs.itens.map(item => {
+      const chave = item.nome?.toLowerCase();
+      const real = map[chave] || Object.values(map).find(p => chave?.includes(p.nome?.toLowerCase()?.split(' ')[0]));
+      if (real && real.id && real.id !== item.id) {
+        logger.warn('ID de produto corrigido', { nome: item.nome, idFalso: item.id, idReal: real.id });
+        return { ...item, id: real.id, preco: real.preco };
+      }
+      return item;
+    });
+
+    const total = itensCorrigidos.reduce((sum, i) => sum + (i.preco * i.quantidade), 0);
     try {
       const telefone = inputs.telefone || session.customerPhone || session.phone;
       const pedido = await criarPedido({
         telefone,
         nomeCliente: inputs.nome_cliente || session.customerName || 'Cliente WhatsApp',
         endereco: inputs.endereco,
-        itens: inputs.itens,
+        itens: itensCorrigidos,
         total,
         formaPagamento: inputs.forma_pagamento,
         observacoes: inputs.observacoes,
