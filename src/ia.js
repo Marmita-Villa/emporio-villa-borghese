@@ -87,11 +87,13 @@ async function executarFerramenta(nomeFerramenta, inputs, session) {
   logger.info(`IA chamou ferramenta: ${nomeFerramenta}`, inputs);
 
   if (nomeFerramenta === 'buscar_cliente') {
-    // Tenta encontrar o cliente por CPF, telefone ou nome (na ordem de prioridade)
+    // Coleta todos os identificadores únicos fornecidos pela IA
+    const ids = [...new Set([inputs.cpf, inputs.telefone, inputs.nome].filter(Boolean))];
     let cliente = null;
-    if (inputs.cpf)      cliente = await buscarCliente(inputs.cpf);
-    if (!cliente && inputs.telefone) cliente = await buscarCliente(inputs.telefone);
-    if (!cliente && inputs.nome)     cliente = await buscarCliente(inputs.nome);
+    for (const id of ids) {
+      cliente = await buscarCliente(id);
+      if (cliente) break;
+    }
     if (!cliente) {
       return `Cliente não encontrado no cadastro. Tratar como novo cliente.`;
     }
@@ -243,7 +245,11 @@ DATA E HORA ATUAL: ${agora}
 O cliente já foi saudado e pediu para digitar seu nome, CPF ou telefone. A primeira mensagem que você vai receber é essa identificação.
 
 AO RECEBER A IDENTIFICAÇÃO DO CLIENTE:
-1. Use SEMPRE a ferramenta buscar_cliente com o que o cliente enviou (pode ser nome, CPF ou telefone)
+1. Use SEMPRE a ferramenta buscar_cliente com o que o cliente enviou. Regras de preenchimento:
+   - Número com 11 dígitos: passe nos campos TANTO cpf QUANTO telefone ao mesmo tempo (pode ser qualquer um)
+   - Número com 10 dígitos ou menos: passe só em telefone
+   - Texto (nome): passe só em nome
+   - CPF com pontuação (ex: 108.485.758-81): passe só em cpf
 2. Se encontrar cadastro:
    - Cumprimente pelo nome com carinho e mencione o número de pedidos ("Já é seu 12º pedido!")
    - Se tiver último pedido: pergunte se quer repetir ("Da última vez você levou X e Y — quer repetir?")
