@@ -390,11 +390,6 @@
   }
 
   async function carregarMensagens(phone) {
-    // Salva estado do input ANTES de qualquer re-render
-    const inputAntes = document.getElementById('msg-input');
-    const textoSalvo = inputAntes ? inputAntes.value : null;
-    const estavafocado = document.activeElement === inputAntes;
-
     const data = await api(`/conversa/${phone}/historico`);
     if (!data || !data.conversa) return;
 
@@ -404,11 +399,16 @@
     const inputContainer = document.getElementById('input-container');
     const scrollBottom = area.scrollHeight - area.scrollTop === area.clientHeight;
 
-    // Input e botões
+    // Input e botões — captura o estado APÓS o await, nunca sobrescreve o que foi digitado
+    const inputAtual = document.getElementById('msg-input');
+    const textoAtual = inputAtual ? inputAtual.value : null;
+    const estavafocado = document.activeElement === inputAtual;
+
     const meuAtendimento = conversa.status === 'em_atendimento';
     if (meuAtendimento) {
       actions.innerHTML = `<button class="btn-encerrar" onclick="encerrarConversa('${phone}')">✅ Encerrar</button>`;
-      if (!document.getElementById('msg-input')) {
+      if (!inputAtual) {
+        // Só cria o textarea na primeira vez — nunca destrói se já existe
         inputContainer.innerHTML = `
           <div class="input-area">
             <textarea id="msg-input" placeholder="Digite sua mensagem..." rows="1"
@@ -416,6 +416,7 @@
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensagem('${phone}')}"></textarea>
             <button onclick="enviarMensagem('${phone}')">&#9658;</button>
           </div>`;
+        document.getElementById('msg-input').focus();
       }
     } else if (conversa.status === 'aguardando') {
       actions.innerHTML = `<button class="btn-assumir" onclick="assumirConversa('${phone}')">✋ Assumir</button>`;
@@ -451,11 +452,15 @@
       area.scrollTop = area.scrollHeight;
     }
 
-    // Restaura o que estava sendo digitado e o foco — a prova de qualquer re-render
-    const inputDepois = document.getElementById('msg-input');
-    if (inputDepois && textoSalvo !== null) {
-      inputDepois.value = textoSalvo;
-      if (estavafocado) inputDepois.focus();
+    // Restaura texto e foco se o textarea existia e foi re-criado por algum motivo
+    const inputFinal = document.getElementById('msg-input');
+    if (inputFinal && inputAtual && inputFinal !== inputAtual) {
+      // Textarea foi re-criado — restaura o valor
+      inputFinal.value = textoAtual || '';
+      if (estavafocado) inputFinal.focus();
+    } else if (inputFinal && estavafocado && document.activeElement !== inputFinal) {
+      // Textarea existe mas perdeu o foco (ex: area.innerHTML roubou foco)
+      inputFinal.focus();
     }
   }
 
