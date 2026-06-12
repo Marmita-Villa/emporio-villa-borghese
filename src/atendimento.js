@@ -108,6 +108,25 @@ async function processarMensagem(session, texto) {
     return `Obrigada pela preferência! 😊 Se precisar de qualquer coisa, é só mandar mensagem que a gente te atende.\n\nAté a próxima! 👋`;
   }
 
+  // ── Modo IA: detecta pedido de atendente humano no meio da conversa ──
+  const textoLower = texto.trim().toLowerCase();
+  const querHumano =
+    textoLower.includes('atendente') ||
+    textoLower.includes('humano') ||
+    textoLower.includes('pessoa') ||
+    textoLower.includes('falar com alguem') ||
+    textoLower.includes('falar com alguém') ||
+    textoLower.includes('quero falar') ||
+    textoLower.includes('chamar atendente') ||
+    textoLower.includes('suporte humano');
+
+  if (session.step === 'ai' && querHumano) {
+    session.step = 'humano';
+    session.transferredToHuman = true;
+    logger.info('Cliente solicitou atendente humano no meio da conversa IA', { phone: session.phone });
+    return `Claro! 😊 Vou chamar um atendente para você agora.\n\nAguarda um momento que alguém da nossa equipe vai assumir essa conversa aqui mesmo pelo WhatsApp. 🙌`;
+  }
+
   // ── Modo IA: Maithe processa o formulário e os pedidos ──
   return await processarComIA(session, texto);
 }
