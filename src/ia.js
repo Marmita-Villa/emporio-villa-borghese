@@ -211,7 +211,7 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
       salvarPedido({
         phone: session.phone,
         customerName: inputs.nome_cliente || session.customerName,
-        orderNumber: String(pedido.id || pedido.numero),
+        orderNumber: String(pedido.numero || pedido.id),
         total,
         formaPagamento: inputs.forma_pagamento,
         endereco: inputs.endereco,
@@ -219,7 +219,7 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
         itensOferta,
       }).catch(() => {}); // fire-and-forget, não bloqueia a resposta
 
-      return `Pedido registrado com sucesso! Número: #${pedido.id || pedido.numero}. Total: R$ ${total.toFixed(2)}. Previsão de entrega: ${pedido.previsao_entrega || '30-50 minutos'}.`;
+      return `Pedido registrado com sucesso! Número: #${pedido.numero || pedido.id}. Total: R$ ${total.toFixed(2)}. Previsão de entrega: ${pedido.previsao_entrega || '30-50 minutos'}.`;
     } catch (err) {
       // Retorna o erro como resultado da ferramenta para a IA comunicar ao cliente
       logger.warn(`Erro ao finalizar pedido`, { phone: session.phone, error: err.message });
