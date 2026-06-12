@@ -218,6 +218,12 @@
     .role-badge.admin { background: rgba(196,120,50,0.15); color: var(--laranja); }
     .role-badge.agent { background: var(--laranja-pale); color: var(--laranja); }
 
+    /* ── Supervisor ── */
+    .supervisor-bar { padding: 10px 16px; background: #fff8ee; border-top: 2px solid var(--laranja-light); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; }
+    .supervisor-info { font-size: 12px; color: var(--laranja); font-weight: 500; }
+    .btn-intervir { background: var(--laranja); color: white; border: none; padding: 7px 16px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.2s; white-space: nowrap; }
+    .btn-intervir:hover { background: var(--laranja-mid); }
+
     /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -507,9 +513,13 @@
     bMinhas.textContent = minhas.length;
     bMinhas.style.display = minhas.length ? 'inline' : 'none';
 
-    const lista = abaAtual === 'fila' ? aguardando : minhas;
+    // Admin vê todas as conversas em atendimento; agente vê só as suas
+    const listaAtendimento = agente.role === 'admin' ? emAtendimento : minhas;
+    const lista = abaAtual === 'fila' ? aguardando : listaAtendimento;
     document.getElementById('list-header').textContent =
-      abaAtual === 'fila' ? 'Aguardando atendimento' : 'Minhas conversas ativas';
+      abaAtual === 'fila' ? 'Aguardando atendimento'
+      : agente.role === 'admin' ? 'Todas as conversas ativas'
+      : 'Minhas conversas ativas';
 
     const container = document.getElementById('conv-items');
     if (!lista.length) {
@@ -563,7 +573,12 @@
     const tagsArr = conversa.tags || [];
     tagsEl.innerHTML = tagsArr.map(t => `<span class="tag-badge tag-${t}">${tagLabel(t)}</span>`).join('');
 
-    const meuAtendimento = conversa.status === 'em_atendimento';
+    const isAdmin = agente.role === 'admin';
+    const isAssigned = conversa.assigned_name === agente.nome;
+    const emAtendimento = conversa.status === 'em_atendimento';
+    const meuAtendimento = emAtendimento && isAssigned;
+    const supervisorMode = isAdmin && emAtendimento && !isAssigned;
+
     if (meuAtendimento) {
       actions.innerHTML = `
         <button class="btn-tags" onclick="abrirModalTags('${phone}')">🏷️ Tags</button>
@@ -581,6 +596,19 @@
             <button onclick="enviarMensagem('${phone}')">&#9658;</button>
           </div>`;
         document.getElementById('msg-input').focus();
+      }
+    } else if (supervisorMode) {
+      // Admin monitorando conversa de outro atendente
+      actions.innerHTML = `
+        <button class="btn-tags" onclick="abrirModalTags('${phone}')">🏷️ Tags</button>
+        <button class="btn-transferir" onclick="abrirModalTransferir('${phone}')">🔄 Transferir</button>
+        <button class="btn-encerrar" onclick="encerrarConversa('${phone}')">✅ Encerrar</button>`;
+      if (!inputContainer.querySelector('.supervisor-bar')) {
+        inputContainer.innerHTML = `
+          <div class="supervisor-bar">
+            <span class="supervisor-info">👁️ Monitorando — <strong>${conversa.assigned_name}</strong> está atendendo</span>
+            <button class="btn-intervir" onclick="ativarIntervencao('${phone}')">⚡ Intervir</button>
+          </div>`;
       }
     } else if (conversa.status === 'aguardando') {
       actions.innerHTML = `<button class="btn-assumir" onclick="assumirConversa('${phone}')">✋ Assumir</button>`;
@@ -647,6 +675,24 @@
       // Textarea existe mas perdeu o foco (ex: area.innerHTML roubou foco)
       inputFinal.focus();
     }
+  }
+
+  function ativarIntervencao(phone) {
+    const inputContainer = document.getElementById('input-container');
+    inputContainer.innerHTML = `
+      <div class="supervisor-bar">
+        <span class="supervisor-info">⚡ Modo intervenção — sua mensagem será enviada como supervisor</span>
+      </div>
+      <div class="input-area" style="position:relative;border-top:none">
+        <div class="quick-reply-btn" onclick="toggleRespostasRapidas()" title="Respostas rápidas">⚡
+          <div class="quick-replies-dropdown" id="qr-dropdown"></div>
+        </div>
+        <textarea id="msg-input" placeholder="Mensagem do supervisor..." rows="1"
+          oninput="autoResize(this)"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensagem('${phone}')}"></textarea>
+        <button onclick="enviarMensagem('${phone}')">&#9658;</button>
+      </div>`;
+    document.getElementById('msg-input').focus();
   }
 
   async function assumirConversa(phone) {
