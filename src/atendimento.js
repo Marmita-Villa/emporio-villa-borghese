@@ -75,7 +75,7 @@ async function processarMensagem(session, texto) {
   // ── Etapa 2: Processa a escolha ──
   if (session.step === 'aguardando_escolha') {
     const opcao = texto.trim().toLowerCase();
-    const escolheuVirtual = opcao === '1' || (opcao.includes('maithe') && !opcao.includes('humano')) || opcao.includes('virtual');
+    const escolheuVirtual = opcao === '1' || (opcao.includes('mai') && !opcao.includes('humano')) || opcao.includes('virtual');
     const escolheuHumano  = opcao === '2' || opcao.includes('humano') || opcao.includes('real') || opcao.includes('atendente');
 
     if (escolheuVirtual) {
@@ -90,7 +90,7 @@ async function processarMensagem(session, texto) {
       return [await getMsg('msg_boas_vindas_humano'), await getMsg('msg_formulario_humano')];
     }
 
-    return `Não entendi 😅 Por favor, escolha:\n\n1️⃣ *Maithe* — Atendente virtual\n2️⃣ *Atendente humano*\n\nDigite *1* ou *2*`;
+    return `Não entendi 😅 Por favor, escolha:\n\n1️⃣ *mAI* — Atendente virtual\n2️⃣ *Atendente humano*\n\nDigite *1* ou *2*`;
   }
 
   // ── Modo humano: aguarda formulário preenchido ──
@@ -100,7 +100,7 @@ async function processarMensagem(session, texto) {
       return [await getMsg('msg_boas_vindas_maithe'), await getMsg('msg_formulario_humano')];
     }
     logger.info(`Formulário humano recebido`, { phone: session.phone });
-    return `Recebemos seu pedido! ✅\n\nUm de nossos atendentes vai te chamar em breve para confirmar tudo. 😊\n\nSe mudar de ideia, manda *1* para falar com a Maithe agora.`;
+    return `Recebemos seu pedido! ✅\n\nUm de nossos atendentes vai te chamar em breve para confirmar tudo. 😊\n\nSe mudar de ideia, manda *1* para falar com a mAI agora.`;
   }
 
   // ── Pedido concluído ──

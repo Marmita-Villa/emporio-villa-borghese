@@ -634,7 +634,7 @@
     let html = '<div class="divider">— Histórico do bot —</div>';
     for (const msg of botMessages) {
       const classe = msg.role === 'user' ? 'client' : 'bot';
-      const label = msg.role === 'user' ? '👤 Cliente' : '🤖 Maithe';
+      const label = msg.role === 'user' ? '👤 Cliente' : '🤖 mAI';
       html += `<div class="msg ${classe}"><div class="msg-label">${label}</div>${esc(msg.content)}</div>`;
     }
 
@@ -860,7 +860,7 @@
       for (const msg of botMessages) {
         const isClient = msg.role === 'user';
         html += `<div style="display:flex;flex-direction:column;align-items:${isClient ? 'flex-start' : 'flex-end'}">
-          <div style="font-size:11px;color:#b2bec3;margin-bottom:2px">${isClient ? '👤 Cliente' : '🤖 Maithe'}</div>
+          <div style="font-size:11px;color:#b2bec3;margin-bottom:2px">${isClient ? '👤 Cliente' : '🤖 mAI'}</div>
           <div style="background:${isClient ? '#f1f3f4' : '#dcf8c6'};padding:8px 12px;border-radius:10px;max-width:80%;font-size:13px;white-space:pre-wrap">${esc(msg.content)}</div>
         </div>`;
       }
@@ -1070,7 +1070,7 @@
 
     const LABELS = {
       msg_menu:               'Menu Inicial (primeiro contato)',
-      msg_boas_vindas_maithe: 'Boas-vindas do Bot (Maithe)',
+      msg_boas_vindas_maithe: 'Boas-vindas do Bot (mAI)',
       msg_boas_vindas_humano: 'Boas-vindas do Atendente Humano',
       msg_formulario_humano:  'Formulário de Pedido',
       msg_encerramento:       'Mensagem de Encerramento',

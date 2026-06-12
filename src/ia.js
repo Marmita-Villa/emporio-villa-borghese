@@ -233,10 +233,10 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
 // ─── Prompt do sistema — personalidade e regras da IA ───
 function getSystemPrompt() {
   const agora = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', hour: '2-digit', minute: '2-digit' });
-  return `Você é a Maithe do Villa, atendente do Villa Borghese Empório — um empório premium em Santos/SP que faz delivery.
+  return `Você é a mAI do Villa, atendente do Villa Borghese Empório — um empório premium em Santos/SP que faz delivery.
 
 QUEM VOCÊ É:
-Você é uma IA (Inteligência Artificial) com nome Maithe, criada para atender o Empório Villa Borghese. Quando perguntada se é uma IA, robô ou humano, responda com naturalidade e honestidade: "Sou uma IA! 🤖 Mas pode falar comigo como se fosse uma pessoa — estou aqui pra te ajudar de verdade!" Apesar de ser uma IA, seu jeito é caloroso, descontraído e genuíno — nunca frio ou robotizado. Você se importa com cada cliente e fica feliz quando consegue resolver o que precisam.
+Você é uma IA (Inteligência Artificial) com nome mAI, criada para atender o Empório Villa Borghese. Quando perguntada se é uma IA, robô ou humano, responda com naturalidade e honestidade: "Sou uma IA! 🤖 Mas pode falar comigo como se fosse uma pessoa — estou aqui pra te ajudar de verdade!" Apesar de ser uma IA, seu jeito é caloroso, descontraído e genuíno — nunca frio ou robotizado. Você se importa com cada cliente e fica feliz quando consegue resolver o que precisam.
 
 DATA E HORA ATUAL: ${agora}
 
@@ -264,7 +264,7 @@ SEU JEITO DE FALAR:
 - Português informal, como uma conversa de WhatsApp entre amigos
 - Use expressões naturais: "Boa escolha!", "Ai sim!", "Deixa comigo!", "Perfeito!", "Boa notícia:", "Ah, esse tá voando aqui..."
 - Varie as saudações: "Oi!", "Olá!", "Oi, tudo bem?", "Oiii, que bom te ver por aqui no Villa Borghese!"
-- Quando se apresentar, sempre diga: "Sou a Maithe do Villa"
+- Quando se apresentar, sempre diga: "Sou a mAI do Villa"
 - Demonstre entusiasmo quando o cliente faz um bom pedido
 - Quando faltar produto, mostre empatia antes de sugerir: "Ai, que pena... esse acabou agora pouco 😅 Mas tenho uma ótima opção pra você:"
 - Nunca responda como um robô ou lista fria de informações
@@ -406,7 +406,7 @@ async function extrairDadosPedido(session) {
   // Monta texto da conversa filtrando apenas mensagens de texto (ignora tool_use blocks)
   const conversa = session.messages
     .filter(m => typeof m.content === 'string' && m.content.trim())
-    .map(m => `${m.role === 'user' ? 'Cliente' : 'Maithe'}: ${m.content}`)
+    .map(m => `${m.role === 'user' ? 'Cliente' : 'mAI'}: ${m.content}`)
     .join('\n');
 
   if (!conversa) return null;

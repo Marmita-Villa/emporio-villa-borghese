@@ -12,8 +12,8 @@ function getSupabase() {
 
 // Valores padrão caso a tabela ainda não exista
 const DEFAULTS = {
-  msg_menu: `Olá! 👋 Bem-vindo ao *Villa Borghese Empório*!\n\nComo prefere ser atendido?\n\n1️⃣ *Maithe* — Atendente virtual por IA (disponível agora)\n2️⃣ *Atendente humano* — Um de nossa equipe vai te chamar\n\nDigite *1* ou *2*`,
-  msg_boas_vindas_maithe: `Oi! Sou a *Maithe*, atendente por IA do *Empório Villa Borghese* 🤖😊\n\nMe diz seu *nome*, *CPF* ou *telefone* que eu te encontro aqui no sistema e já começamos!`,
+  msg_menu: `Olá! 👋 Bem-vindo ao *Villa Borghese Empório*!\n\nComo prefere ser atendido?\n\n1️⃣ *mAI* — Atendente virtual por IA (disponível agora)\n2️⃣ *Atendente humano* — Um de nossa equipe vai te chamar\n\nDigite *1* ou *2*`,
+  msg_boas_vindas_maithe: `Oi! Sou a *mAI*, atendente por IA do *Empório Villa Borghese* 🤖😊\n\nMe diz seu *nome*, *CPF* ou *telefone* que eu te encontro aqui no sistema e já começamos!`,
   msg_boas_vindas_humano: `Olá! Seja bem-vindo ao delivery do *Empório Villa Borghese*! 😊\n\nEstamos com mais um canal de atendimento para realizar suas compras, através do nosso site www.emporiovillaborghese.com.br`,
   msg_formulario_humano: `Para prosseguir seu atendimento por WhatsApp, preencha os campos abaixo e aguarde que um de nossos colaboradores irá lhe atender:\n\n*Nome Completo:*\n*CPF:*\n*Telefone:*\n*Endereço (Rua, Número, Bairro, Cidade/UF, CEP):*\n*Forma de pagamento:*\n*Pedido:*\n\n*Observações:*\n- Especificar a quantidade, marca e produto;\n- Antes de enviar o seu pedido, verifique se todos os itens estão de acordo com a sua preferência;\nVocê aceita marcas similares? ( ) sim ou ( ) não.\nAgradecemos seu contato! 😊`,
   msg_encerramento: `✅ Atendimento encerrado!\n\nMuito obrigado pelo contato com o *Empório Villa Borghese*! 😊\n\nFoi um prazer te atender. Se precisar de qualquer coisa é só mandar uma mensagem — estamos sempre por aqui! 🛒`,
