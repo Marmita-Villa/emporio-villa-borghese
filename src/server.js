@@ -231,7 +231,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // ─── Monitor de sessões inativas (verifica a cada 2 minutos) ───
 setInterval(async () => {
-  const expiradas = verificarSessoesExpiradas();
+  const expiradas = await verificarSessoesExpiradas();
   for (const { phone } of expiradas) {
     logger.info(`Sessão expirada por inatividade`, { phone });
     try {
