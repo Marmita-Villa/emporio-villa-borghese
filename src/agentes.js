@@ -149,14 +149,17 @@ router.get('/conversa/:phone/historico', verificarToken, async (req, res) => {
   const { phone } = req.params;
   const sb = getSupabase();
 
-  const [convRes, msgsRes] = await Promise.all([
-    sb.from('conversations').select('*').eq('phone', phone).single(),
-    sb.from('human_messages').select('*').eq('phone', phone).order('created_at'),
-  ]);
+  const convRes = await sb.from('conversations').select('*').eq('phone', phone).single();
+  const conv = convRes.data;
+
+  // Filtra mensagens humanas apenas da sessão atual (a partir de human_started_at)
+  let msgsQuery = sb.from('human_messages').select('*').eq('phone', phone).order('created_at');
+  if (conv?.human_started_at) msgsQuery = msgsQuery.gte('created_at', conv.human_started_at);
+  const msgsRes = await msgsQuery;
 
   res.json({
-    conversa: convRes.data || null,
-    botMessages: convRes.data?.messages || [],
+    conversa: conv || null,
+    botMessages: conv?.messages || [],
     humanMessages: msgsRes.data || [],
   });
 });
