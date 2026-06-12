@@ -124,10 +124,11 @@ app.get('/api/dashboard', async (req, res) => {
   const { createClient } = require('@supabase/supabase-js');
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-  const [ordersRes, convsRes, humanConvsRes] = await Promise.all([
+  const [ordersRes, convsRes, humanConvsRes, msgsPorAgenteRes] = await Promise.all([
     sb.from('orders').select('*').gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
     sb.from('conversations').select('phone,customer_name,step,converted,transferred_to_human,created_at,started_at,updated_at').gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
     sb.from('conversations').select('assigned_name,human_started_at,human_ended_at').not('assigned_name', 'is', null).not('human_started_at', 'is', null).gte('human_started_at', fromDate.toISOString()).lte('human_started_at', toDate.toISOString()),
+    sb.from('human_messages').select('agent_name').eq('direction', 'out').not('agent_name', 'is', null).gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
   ]);
 
   const orders = ordersRes.data || [];
@@ -141,8 +142,9 @@ app.get('/api/dashboard', async (req, res) => {
   const convertidos       = convs.filter(c => c.converted).length;
   const taxaConversao     = totalAtendimentos > 0 ? (convertidos / totalAtendimentos * 100) : 0;
   const transf            = convs.filter(c => c.transferred_to_human).length;
+  const apenasBot         = totalAtendimentos - transf;
 
-  // Top produtos
+  // Top produtos (todos os itens somados)
   const prodMap = {};
   for (const o of orders) {
     for (const item of (o.itens || [])) {
@@ -152,9 +154,9 @@ app.get('/api/dashboard', async (req, res) => {
       prodMap[item.nome].valor += (item.quantidade || 1) * (item.preco || 0);
     }
   }
-  const topProdutos = Object.values(prodMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 10);
+  const topProdutos = Object.values(prodMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 15);
 
-  // Top ofertas vendidas
+  // Top ofertas
   const ofMap = {};
   for (const o of orders) {
     for (const item of (o.itens_oferta || [])) {
@@ -164,7 +166,28 @@ app.get('/api/dashboard', async (req, res) => {
       ofMap[item.nome].valor += (item.quantidade || 1) * (item.preco || 0);
     }
   }
-  const topOfertas = Object.values(ofMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 10);
+  const topOfertas = Object.values(ofMap).sort((a, b) => b.quantidade - a.quantidade).slice(0, 15);
+
+  // Top itens combinados (produtos + ofertas)
+  const todosItens = { ...prodMap };
+  for (const [k, v] of Object.entries(ofMap)) {
+    todosItens[k] = todosItens[k]
+      ? { nome: k, quantidade: todosItens[k].quantidade + v.quantidade, valor: todosItens[k].valor + v.valor }
+      : v;
+  }
+  const topItens = Object.values(todosItens).sort((a, b) => b.quantidade - a.quantidade).slice(0, 15);
+
+  // Top clientes por pedidos e valor
+  const clienteMap = {};
+  for (const o of orders) {
+    const key = o.customer_name || o.phone || '?';
+    clienteMap[key] = clienteMap[key] || { nome: key, pedidos: 0, valor: 0 };
+    clienteMap[key].pedidos++;
+    clienteMap[key].valor += o.total || 0;
+  }
+  const topClientes = Object.values(clienteMap)
+    .sort((a, b) => b.pedidos - a.pedidos || b.valor - a.valor)
+    .slice(0, 15);
 
   // Vendas por dia
   const vendaDia = {};
@@ -173,6 +196,15 @@ app.get('/api/dashboard', async (req, res) => {
     vendaDia[d] = vendaDia[d] || { data: d, total: 0, pedidos: 0 };
     vendaDia[d].total += o.total || 0;
     vendaDia[d].pedidos++;
+  }
+
+  // Vendas por dia da semana
+  const DS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const porDiaSemana = DS.map(d => ({ dia: d, pedidos: 0, total: 0 }));
+  for (const o of orders) {
+    const idx = new Date(o.created_at).getDay();
+    porDiaSemana[idx].pedidos++;
+    porDiaSemana[idx].total += o.total || 0;
   }
 
   // Formas de pagamento
@@ -186,7 +218,12 @@ app.get('/api/dashboard', async (req, res) => {
   const porHora = Array(24).fill(0);
   for (const c of convs) { porHora[new Date(c.created_at).getHours()]++; }
 
-  // Relatório por atendente
+  // Relatório por atendente (com mensagens enviadas)
+  const msgCount = {};
+  for (const m of (msgsPorAgenteRes.data || [])) {
+    msgCount[m.agent_name] = (msgCount[m.agent_name] || 0) + 1;
+  }
+
   const humanConvs = humanConvsRes.data || [];
   const agentMap = {};
   for (const c of humanConvs) {
@@ -195,8 +232,8 @@ app.get('/api/dashboard', async (req, res) => {
     agentMap[nome] = agentMap[nome] || { nome, conversas: 0, tempoTotal: 0, comTempo: 0 };
     agentMap[nome].conversas++;
     if (c.human_started_at && c.human_ended_at) {
-      const dur = (new Date(c.human_ended_at) - new Date(c.human_started_at)) / 60000; // minutos
-      if (dur > 0 && dur < 480) { // ignora durações absurdas (>8h)
+      const dur = (new Date(c.human_ended_at) - new Date(c.human_started_at)) / 60000;
+      if (dur > 0 && dur < 480) {
         agentMap[nome].tempoTotal += dur;
         agentMap[nome].comTempo++;
       }
@@ -206,14 +243,18 @@ app.get('/api/dashboard', async (req, res) => {
     nome: a.nome,
     conversas: a.conversas,
     tempoMedio: a.comTempo > 0 ? Math.round(a.tempoTotal / a.comTempo) : null,
+    mensagens: msgCount[a.nome] || 0,
   })).sort((a, b) => b.conversas - a.conversas);
 
   res.json({
     periodo: { from: fromDate, to: toDate },
-    kpis: { totalVendido, totalPedidos, ticketMedio, totalAtendimentos, taxaConversao, transferidosHumano: transf },
+    kpis: { totalVendido, totalPedidos, ticketMedio, totalAtendimentos, taxaConversao, transferidosHumano: transf, apenasBot, convertidos },
     topProdutos,
     topOfertas,
+    topItens,
+    topClientes,
     vendasPorDia: Object.values(vendaDia).sort((a, b) => a.data.localeCompare(b.data)),
+    vendasPorDiaSemana: porDiaSemana,
     pagamentos,
     atendimentosPorHora: porHora,
     relatorioAtendentes,
