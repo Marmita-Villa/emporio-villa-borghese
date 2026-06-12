@@ -140,7 +140,7 @@ async function criarPedido(pedido) {
       total: pedido.total,
       forma_pagamento: pedido.formaPagamento,
       observacoes: pedido.observacoes || '',
-      canal: 'whatsapp',
+      canal: 'web',
     };
 
     const res = await api.post('/pedidos', payload);
