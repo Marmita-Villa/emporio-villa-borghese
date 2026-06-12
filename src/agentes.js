@@ -168,7 +168,7 @@ router.post('/conversa/:phone/encerrar', verificarToken, async (req, res) => {
   await clearSession(phone);
 
   try {
-    await enviarMensagem(phone, '👋 Atendimento encerrado. Se precisar de algo mais é só chamar!');
+    await enviarMensagem(phone, `✅ Atendimento encerrado!\n\nMuito obrigado pelo contato com o *Empório Villa Borghese*! 😊\n\nFoi um prazer te atender. Se precisar de qualquer coisa é só mandar uma mensagem — estamos sempre por aqui! 🛒`);
   } catch (_) {}
 
   logger.info('Conversa encerrada pelo agente', { phone, agente: req.agente.nome });
