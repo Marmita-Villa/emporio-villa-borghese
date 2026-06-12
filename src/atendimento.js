@@ -75,7 +75,7 @@ async function processarMensagem(session, texto) {
   // ── Etapa 2: Processa a escolha ──
   if (session.step === 'aguardando_escolha') {
     const opcao = texto.trim().toLowerCase();
-    const escolheuVirtual = opcao === '1' || opcao.includes('maithe') || opcao.includes('virtual');
+    const escolheuVirtual = opcao === '1' || (opcao.includes('maithe') && !opcao.includes('humano')) || opcao.includes('virtual');
     const escolheuHumano  = opcao === '2' || opcao.includes('humano') || opcao.includes('real') || opcao.includes('atendente');
 
     if (escolheuVirtual) {
@@ -115,6 +115,9 @@ async function processarMensagem(session, texto) {
     if (querNovoPedido) {
       session.messages = [];
       session.cart = [];
+      session.productMap = {};
+      session.productCache = {};
+      session.currentOffers = [];
       session.step = 'ai';
       return `Que ótimo! 🛒 O que você quer pedir dessa vez?`;
     }

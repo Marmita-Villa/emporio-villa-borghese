@@ -58,6 +58,7 @@ function createSessionObj(phone) {
     startedAt: Date.now(),
     customerName: null,
     productCache: {},
+    productMap: {},
     currentOffers: [],
     converted: false,
     transferredToHuman: false,
