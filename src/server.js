@@ -7,6 +7,7 @@ const { getOrCreateSession, clearSession, verificarSessoesExpiradas } = require(
 const { saveSession, salvarConversa } = require('./db');
 const agentesRouter = require('./agentes');
 const { processarMensagem } = require('./atendimento');
+const { getMsg } = require('./config');
 
 const app = express();
 app.use(express.json());
@@ -301,10 +302,8 @@ setInterval(async () => {
   for (const { phone } of expiradas) {
     logger.info(`Sessão expirada por inatividade`, { phone });
     try {
-      await enviarMensagem(
-        phone,
-        '👋 Sua conversa foi encerrada por inatividade.\n\nSe precisar de algo é só mandar uma mensagem! 😊'
-      );
+      const msgInativ = await getMsg('msg_inatividade');
+      await enviarMensagem(phone, msgInativ);
     } catch (err) {
       logger.error(`Erro ao notificar encerramento`, { phone, error: err.message });
     }

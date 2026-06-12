@@ -403,6 +403,11 @@
             <tbody id="rr-tbody"></tbody>
           </table>
         </div>
+
+        <h2 style="margin-top:32px">💬 Mensagens do Sistema</h2>
+        <div id="config-msgs-container">
+          <div style="color:var(--cinza-3);font-size:13px;padding:16px 0">Carregando mensagens...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -482,7 +487,7 @@
 
     if (aba === 'fila' || aba === 'minhas') carregarFila();
     if (aba === 'historico') carregarHistorico();
-    if (aba === 'agentes') { carregarAgentes(); carregarTabelaRespostasRapidas(); }
+    if (aba === 'agentes') { carregarAgentes(); carregarTabelaRespostasRapidas(); carregarConfigMensagens(); }
 
     fecharChat();
   }
@@ -1046,6 +1051,50 @@
     await api(`/respostas-rapidas/${id}`, { method: 'DELETE' });
     await Promise.all([carregarTabelaRespostasRapidas(), carregarRespostasRapidas()]);
   }
+
+  // ── Admin: Mensagens do Sistema ──
+  async function carregarConfigMensagens() {
+    const container = document.getElementById('config-msgs-container');
+    if (!container) return;
+    const data = await api('/config');
+    if (!data || data.error) {
+      container.innerHTML = '<div style="color:#c0392b;font-size:13px;padding:16px 0">Erro ao carregar configurações.</div>';
+      return;
+    }
+
+    const LABELS = {
+      msg_menu:               'Menu Inicial (primeiro contato)',
+      msg_boas_vindas_maithe: 'Boas-vindas do Bot (Maithe)',
+      msg_boas_vindas_humano: 'Boas-vindas do Atendente Humano',
+      msg_formulario_humano:  'Formulário de Pedido',
+      msg_encerramento:       'Mensagem de Encerramento',
+      msg_inatividade:        'Sessão Expirada por Inatividade',
+    };
+
+    container.innerHTML = Object.entries(LABELS).map(([chave, label]) => `
+      <div class="agent-form" style="margin-bottom:16px">
+        <h3 style="margin:0 0 8px;font-size:14px;color:var(--texto)">${label}</h3>
+        <textarea id="cfg-${chave}" rows="5" style="width:100%;padding:12px;border:1.5px solid var(--cinza-2);border-radius:8px;font-family:inherit;font-size:13px;resize:vertical;background:var(--creme);outline:none;box-sizing:border-box">${escRaw(data[chave] || '')}</textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px">
+          <button class="btn-criar" onclick="salvarConfigMsg('${chave}')">Salvar</button>
+        </div>
+        <div id="cfg-msg-${chave}" style="font-size:12px;margin-top:4px;min-height:16px"></div>
+      </div>
+    `).join('');
+  }
+
+  async function salvarConfigMsg(chave) {
+    const el = document.getElementById('cfg-' + chave);
+    const msgEl = document.getElementById('cfg-msg-' + chave);
+    if (!el || !msgEl) return;
+    const valor = el.value;
+    const res = await api(`/config/${chave}`, { method: 'PUT', body: JSON.stringify({ valor }) });
+    if (res.error) { msgEl.style.color = '#c0392b'; msgEl.textContent = res.error; return; }
+    msgEl.style.color = '#27ae60'; msgEl.textContent = '✅ Salvo com sucesso!';
+    setTimeout(() => { msgEl.textContent = ''; }, 3000);
+  }
+
+  function escRaw(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   // ── Helpers ──
   function esc(t) { return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*(.*?)\*/g,'<strong>$1</strong>'); }

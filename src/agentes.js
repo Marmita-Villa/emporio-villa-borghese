@@ -6,6 +6,7 @@ const { enviarMensagem } = require('./whatsapp');
 const { clearSession } = require('./session');
 const { saveSession } = require('./db');
 const { getOrCreateSession } = require('./session');
+const { getMsg, getAllConfig, setConfig } = require('./config');
 const logger = require('./logger');
 
 const router = express.Router();
@@ -229,7 +230,8 @@ router.post('/conversa/:phone/encerrar', verificarToken, async (req, res) => {
   await clearSession(phone);
 
   try {
-    await enviarMensagem(phone, `✅ Atendimento encerrado!\n\nMuito obrigado pelo contato com o *Empório Villa Borghese*! 😊\n\nFoi um prazer te atender. Se precisar de qualquer coisa é só mandar uma mensagem — estamos sempre por aqui! 🛒`);
+    const msgEnc = await getMsg('msg_encerramento');
+    await enviarMensagem(phone, msgEnc);
   } catch (_) {}
 
   logger.info('Conversa encerrada pelo agente', { phone, agente: req.agente.nome });
@@ -298,6 +300,22 @@ router.post('/respostas-rapidas', verificarToken, requireAdmin, async (req, res)
 router.delete('/respostas-rapidas/:id', verificarToken, requireAdmin, async (req, res) => {
   const sb = getSupabase();
   await sb.from('quick_replies').delete().eq('id', req.params.id);
+  res.json({ ok: true });
+});
+
+// ─── Configuração de mensagens ───
+
+router.get('/config', verificarToken, requireAdmin, async (req, res) => {
+  const config = await getAllConfig();
+  res.json(config);
+});
+
+router.put('/config/:chave', verificarToken, requireAdmin, async (req, res) => {
+  const { chave } = req.params;
+  const { valor } = req.body;
+  if (!valor?.trim()) return res.status(400).json({ error: 'Valor obrigatório' });
+  await setConfig(chave, valor.trim());
+  logger.info('Configuração atualizada', { chave, por: req.agente.nome });
   res.json({ ok: true });
 });
 
