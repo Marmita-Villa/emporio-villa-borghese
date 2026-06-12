@@ -74,8 +74,9 @@ async function verificarEstoque(produtoId) {
     return res.data;
   } catch (err) {
     if (err.response?.status === 404 || err.response?.status === 400) return { disponivel: false, quantidade: 0 };
+    // Timeout ou erro de rede — não assumir sem estoque, pode ser falso negativo
     logger.error('Erro ao verificar estoque', { produtoId, error: err.message });
-    return { disponivel: false, quantidade: 0 };
+    return { disponivel: true, quantidade: -1, erro: true };
   }
 }
 

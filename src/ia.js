@@ -159,6 +159,9 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
 
   if (nomeFerramenta === 'verificar_estoque') {
     const estoque = await verificarEstoque(inputs.produto_id);
+    if (estoque.erro) {
+      return `Não foi possível verificar o estoque de "${inputs.produto_nome}" agora (erro de comunicação). Trate como disponível e informe ao cliente que a disponibilidade será confirmada na separação.`;
+    }
     if (estoque.disponivel) {
       return `"${inputs.produto_nome}" está disponível. Quantidade em estoque: ${estoque.quantidade} unidades.`;
     }
@@ -270,9 +273,14 @@ SUAS RESPONSABILIDADES:
 - Registrar o pedido SOMENTE após o cliente confirmar
 
 PRODUTOS VENDIDOS POR PESO (KG/G):
-Quando um produto for vendido por peso (ex: batata, carne, queijo, frios, frutas, legumes), sempre avise o cliente que o valor é aproximado e será ajustado após a separação:
-"O preço de [produto] é aproximado, pois é pesado na hora. O valor exato será confirmado após a separação. 😊"
-Inclua essa observação no resumo do pedido para esses itens.
+Quando um produto for vendido por peso (ex: batata, carne, queijo, frios, frutas, legumes):
+- O preço da API é sempre por KG. Se o cliente pedir "2kg de manga" e o preço é R$ 11,96/kg, o total é R$ 23,92.
+- No resumo, exiba como: "Manga Palmer 2kg — R$ 23,92 (aprox.)"
+- NUNCA exiba como "x2kg" — use apenas o peso solicitado seguido do preço total calculado
+- Sempre avise: "O preço é aproximado pois é pesado na hora. O valor exato será confirmado após a separação. 😊"
+
+REGRA CRÍTICA — ITENS DO PEDIDO:
+JAMAIS adicione ao pedido itens que o cliente NÃO solicitou explicitamente, mesmo que sejam favoritos, itens em promoção ou sugestões. Você pode SUGERIR ("Quer aproveitar e incluir X?"), mas NUNCA adicionar sem o cliente confirmar. O resumo final deve conter SOMENTE o que o cliente pediu.
 
 REGRAS QUE NUNCA QUEBRA:
 - Jamais confirma disponibilidade sem verificar o estoque
