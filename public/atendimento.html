@@ -97,6 +97,32 @@
     .btn-assumir:hover { background: #128C7E; }
     .btn-encerrar { background: #e17055; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
     .btn-encerrar:hover { background: #d63031; }
+    .btn-transferir { background: #6c5ce7; color: white; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-transferir:hover { background: #5849c9; }
+    .btn-tags { background: #fdcb6e; color: #2d3436; border: none; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-tags:hover { background: #e8b84b; }
+
+    .tag-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: default; }
+    .tag-pedido { background: #00b894; color: white; }
+    .tag-reclamacao { background: #e17055; color: white; }
+    .tag-duvida { background: #74b9ff; color: #2d3436; }
+    .tag-elogio { background: #a29bfe; color: white; }
+    .tag-outro { background: #dfe6e9; color: #636e72; }
+
+    .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; }
+    .modal-box { background:white; border-radius:14px; width:420px; max-width:95vw; box-shadow:0 8px 40px rgba(0,0,0,0.25); overflow:hidden; }
+    .modal-header { padding:20px 24px; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; justify-content:space-between; }
+    .modal-header h3 { margin:0; font-size:16px; }
+    .modal-close { background:none; border:none; font-size:20px; cursor:pointer; color:#636e72; padding:4px 8px; }
+    .modal-body { padding:20px 24px; }
+
+    .quick-reply-btn { background: #f0f0f0; border: none; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; position: relative; }
+    .quick-reply-btn:hover { background: #ddd; }
+    .quick-replies-dropdown { display:none; position:absolute; bottom:50px; left:0; background:white; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,0.15); min-width:280px; max-height:240px; overflow-y:auto; z-index:100; }
+    .quick-reply-item { padding:10px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #f8f9fa; }
+    .quick-reply-item:hover { background:#f8f9fa; }
+    .quick-reply-item .atalho { font-weight:700; color:#075E54; font-size:11px; }
+    .quick-reply-item .texto { color:#636e72; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; }
 
     .messages-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
     .msg { max-width: 72%; padding: 8px 12px 4px; border-radius: 8px; font-size: 14px; line-height: 1.45; word-wrap: break-word; white-space: pre-wrap; }
@@ -205,6 +231,7 @@
             <div class="info">
               <h3 id="chat-nome"></h3>
               <p id="chat-phone"></p>
+              <div id="chat-tags" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px"></div>
             </div>
             <div class="actions" id="chat-actions"></div>
           </div>
@@ -233,6 +260,40 @@
       </div>
     </div>
 
+    <!-- Modal: Transferir conversa -->
+    <div id="modal-transferir" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>🔄 Transferir Conversa</h3>
+          <button class="modal-close" onclick="fecharModalTransferir()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:13px;color:#636e72;margin-bottom:16px">Selecione o atendente para transferir:</p>
+          <div id="lista-agentes-transferir" style="display:flex;flex-direction:column;gap:8px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Tags -->
+    <div id="modal-tags" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>🏷️ Etiquetas</h3>
+          <button class="modal-close" onclick="fecharModalTags()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="font-size:13px;color:#636e72;margin-bottom:16px">Marque as etiquetas desta conversa:</p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" value="pedido" onchange="toggleTag(this)"> <span class="tag-badge tag-pedido">🛒 Pedido</span></label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" value="reclamacao" onchange="toggleTag(this)"> <span class="tag-badge tag-reclamacao">😠 Reclamação</span></label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" value="duvida" onchange="toggleTag(this)"> <span class="tag-badge tag-duvida">❓ Dúvida</span></label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" value="elogio" onchange="toggleTag(this)"> <span class="tag-badge tag-elogio">⭐ Elogio</span></label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" value="outro" onchange="toggleTag(this)"> <span class="tag-badge tag-outro">📌 Outro</span></label>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Agentes (admin) -->
     <div id="view-agentes" style="display:none; flex:1">
       <div class="admin-panel">
@@ -257,6 +318,23 @@
           <table>
             <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ação</th></tr></thead>
             <tbody id="agents-tbody"></tbody>
+          </table>
+        </div>
+
+        <h2 style="margin-top:32px">⚡ Respostas Rápidas</h2>
+        <div class="agent-form">
+          <h3>Nova Resposta Rápida</h3>
+          <div class="form-row">
+            <input type="text" id="rr-atalho" placeholder="Atalho (ex: saudacao)" style="max-width:160px" />
+            <input type="text" id="rr-texto" placeholder="Texto da mensagem" />
+          </div>
+          <button class="btn-criar" onclick="criarRespostaRapida()">Salvar</button>
+          <div id="rr-msg" style="margin-top:10px;font-size:13px"></div>
+        </div>
+        <div class="agents-table">
+          <table>
+            <thead><tr><th>Atalho</th><th>Mensagem</th><th>Criado por</th><th>Ação</th></tr></thead>
+            <tbody id="rr-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -315,6 +393,7 @@
     if (agente.role === 'admin') document.getElementById('tab-agentes').style.display = 'block';
     mudarAba('fila');
     iniciarPolling();
+    carregarRespostasRapidas(); // pré-carrega para uso no chat
   }
 
   // ── API helper ──
@@ -337,7 +416,7 @@
 
     if (aba === 'fila' || aba === 'minhas') carregarFila();
     if (aba === 'historico') carregarHistorico();
-    if (aba === 'agentes') carregarAgentes();
+    if (aba === 'agentes') { carregarAgentes(); carregarTabelaRespostasRapidas(); }
 
     fecharChat();
   }
@@ -418,13 +497,23 @@
     const textoAtual = inputAtual ? inputAtual.value : null;
     const estavafocado = document.activeElement === inputAtual;
 
+    // Tags no header
+    const tagsEl = document.getElementById('chat-tags');
+    const tagsArr = conversa.tags || [];
+    tagsEl.innerHTML = tagsArr.map(t => `<span class="tag-badge tag-${t}">${tagLabel(t)}</span>`).join('');
+
     const meuAtendimento = conversa.status === 'em_atendimento';
     if (meuAtendimento) {
-      actions.innerHTML = `<button class="btn-encerrar" onclick="encerrarConversa('${phone}')">✅ Encerrar</button>`;
+      actions.innerHTML = `
+        <button class="btn-tags" onclick="abrirModalTags('${phone}')">🏷️ Tags</button>
+        <button class="btn-transferir" onclick="abrirModalTransferir('${phone}')">🔄 Transferir</button>
+        <button class="btn-encerrar" onclick="encerrarConversa('${phone}')">✅ Encerrar</button>`;
       if (!inputAtual) {
-        // Só cria o textarea na primeira vez — nunca destrói se já existe
         inputContainer.innerHTML = `
-          <div class="input-area">
+          <div class="input-area" style="position:relative">
+            <div class="quick-reply-btn" onclick="toggleRespostasRapidas()" title="Respostas rápidas">⚡
+              <div class="quick-replies-dropdown" id="qr-dropdown"></div>
+            </div>
             <textarea id="msg-input" placeholder="Digite sua mensagem..." rows="1"
               oninput="autoResize(this)"
               onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensagem('${phone}')}"></textarea>
@@ -584,10 +673,10 @@
     document.getElementById('modal-conversa').style.display = 'none';
   }
 
-  // Fecha modal clicando fora
-  document.getElementById('modal-conversa').addEventListener('click', function(e) {
-    if (e.target === this) fecharModal();
-  });
+  // Fecha modais clicando fora
+  document.getElementById('modal-conversa').addEventListener('click', function(e) { if (e.target === this) fecharModal(); });
+  document.getElementById('modal-transferir').addEventListener('click', function(e) { if (e.target === this) fecharModalTransferir(); });
+  document.getElementById('modal-tags').addEventListener('click', function(e) { if (e.target === this) fecharModalTags(); });
 
   // ── Admin: Agentes ──
   async function carregarAgentes() {
@@ -626,6 +715,134 @@
   async function toggleAgente(id, ativo) {
     await api(`/agentes/${id}`, { method: 'PATCH', body: JSON.stringify({ ativo }) });
     await carregarAgentes();
+  }
+
+  // ── Transferir conversa ──
+  let phoneParaTransferir = null;
+  async function abrirModalTransferir(phone) {
+    phoneParaTransferir = phone;
+    const lista = document.getElementById('lista-agentes-transferir');
+    lista.innerHTML = '<div style="color:#b2bec3;font-size:13px">Carregando...</div>';
+    document.getElementById('modal-transferir').style.display = 'flex';
+
+    const data = await api('/agentes');
+    const ativos = (data || []).filter(a => a.ativo && a.nome !== agente.nome);
+    if (!ativos.length) {
+      lista.innerHTML = '<div style="color:#b2bec3;font-size:13px">Nenhum outro atendente disponível.</div>';
+      return;
+    }
+    lista.innerHTML = ativos.map(a => `
+      <button onclick="confirmarTransferencia('${a.id}','${a.nome.replace(/'/g,"\\'")}' )"
+        style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;padding:12px 16px;text-align:left;cursor:pointer;font-size:14px;font-weight:600;width:100%">
+        👤 ${a.nome} <span style="font-size:11px;color:#636e72;font-weight:400">${a.role === 'admin' ? '— Admin' : ''}</span>
+      </button>`).join('');
+  }
+  function fecharModalTransferir() {
+    document.getElementById('modal-transferir').style.display = 'none';
+    phoneParaTransferir = null;
+  }
+  async function confirmarTransferencia(agenteId, nomeAgente) {
+    if (!confirm(`Transferir para ${nomeAgente}?`)) return;
+    const res = await api(`/conversa/${phoneParaTransferir}/transferir`, { method: 'POST', body: JSON.stringify({ agente_id: agenteId }) });
+    fecharModalTransferir();
+    if (res.error) { alert(res.error); return; }
+    await carregarMensagens(phoneParaTransferir);
+  }
+
+  // ── Tags ──
+  const TAG_LABELS = { pedido: '🛒 Pedido', reclamacao: '😠 Reclamação', duvida: '❓ Dúvida', elogio: '⭐ Elogio', outro: '📌 Outro' };
+  function tagLabel(t) { return TAG_LABELS[t] || t; }
+  let phoneParaTags = null;
+  let tagsAtuais = [];
+  async function abrirModalTags(phone) {
+    phoneParaTags = phone;
+    const data = await api(`/conversa/${phone}/historico`);
+    tagsAtuais = data?.conversa?.tags || [];
+    // Marca checkboxes conforme tags atuais
+    document.querySelectorAll('#modal-tags input[type=checkbox]').forEach(cb => {
+      cb.checked = tagsAtuais.includes(cb.value);
+    });
+    document.getElementById('modal-tags').style.display = 'flex';
+  }
+  function fecharModalTags() {
+    document.getElementById('modal-tags').style.display = 'none';
+    phoneParaTags = null;
+  }
+  async function toggleTag(cb) {
+    const tag = cb.value;
+    if (cb.checked) { if (!tagsAtuais.includes(tag)) tagsAtuais.push(tag); }
+    else { tagsAtuais = tagsAtuais.filter(t => t !== tag); }
+    await api(`/conversa/${phoneParaTags}/tags`, { method: 'POST', body: JSON.stringify({ tags: tagsAtuais }) });
+    // Atualiza badges no header sem fechar o modal
+    const tagsEl = document.getElementById('chat-tags');
+    if (tagsEl) tagsEl.innerHTML = tagsAtuais.map(t => `<span class="tag-badge tag-${t}">${tagLabel(t)}</span>`).join('');
+  }
+
+  // ── Respostas rápidas ──
+  let respostasRapidas = [];
+  async function carregarRespostasRapidas() {
+    const data = await api('/respostas-rapidas');
+    respostasRapidas = data || [];
+  }
+  function toggleRespostasRapidas() {
+    const dd = document.getElementById('qr-dropdown');
+    if (!dd) return;
+    if (dd.style.display === 'block') { dd.style.display = 'none'; return; }
+    if (!respostasRapidas.length) {
+      dd.innerHTML = '<div style="padding:12px;font-size:13px;color:#b2bec3">Nenhuma resposta cadastrada</div>';
+    } else {
+      dd.innerHTML = respostasRapidas.map(r => `
+        <div class="quick-reply-item" onclick="usarRespostaRapida(${JSON.stringify(r.texto).replace(/"/g,'&quot;')})">
+          <div class="atalho">/${r.atalho}</div>
+          <div class="texto">${esc(r.texto)}</div>
+        </div>`).join('');
+    }
+    dd.style.display = 'block';
+  }
+  function usarRespostaRapida(texto) {
+    const input = document.getElementById('msg-input');
+    if (input) { input.value = texto; input.focus(); autoResize(input); }
+    const dd = document.getElementById('qr-dropdown');
+    if (dd) dd.style.display = 'none';
+  }
+  // Fecha dropdown ao clicar fora
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.quick-reply-btn')) {
+      const dd = document.getElementById('qr-dropdown');
+      if (dd) dd.style.display = 'none';
+    }
+  });
+
+  // ── Admin: Respostas rápidas ──
+  async function carregarTabelaRespostasRapidas() {
+    const data = await api('/respostas-rapidas');
+    const tbody = document.getElementById('rr-tbody');
+    if (!tbody) return;
+    if (!data?.length) { tbody.innerHTML = '<tr><td colspan="4" style="padding:16px;text-align:center;color:#b2bec3">Nenhuma resposta cadastrada</td></tr>'; return; }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td style="font-weight:600;color:#075E54">/${r.atalho}</td>
+        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.texto)}</td>
+        <td style="color:#636e72">${r.created_by || '—'}</td>
+        <td><button class="toggle-btn inativo" onclick="deletarRespostaRapida('${r.id}')">Excluir</button></td>
+      </tr>`).join('');
+  }
+  async function criarRespostaRapida() {
+    const atalho = document.getElementById('rr-atalho').value.trim();
+    const texto  = document.getElementById('rr-texto').value.trim();
+    const msg    = document.getElementById('rr-msg');
+    if (!atalho || !texto) { msg.style.color = '#e17055'; msg.textContent = 'Preencha atalho e texto'; return; }
+    const res = await api('/respostas-rapidas', { method: 'POST', body: JSON.stringify({ atalho, texto }) });
+    if (res.error) { msg.style.color = '#e17055'; msg.textContent = res.error; return; }
+    msg.style.color = '#00b894'; msg.textContent = 'Salvo!';
+    document.getElementById('rr-atalho').value = '';
+    document.getElementById('rr-texto').value = '';
+    await Promise.all([carregarTabelaRespostasRapidas(), carregarRespostasRapidas()]);
+  }
+  async function deletarRespostaRapida(id) {
+    if (!confirm('Excluir esta resposta rápida?')) return;
+    await api(`/respostas-rapidas/${id}`, { method: 'DELETE' });
+    await Promise.all([carregarTabelaRespostasRapidas(), carregarRespostasRapidas()]);
   }
 
   // ── Helpers ──

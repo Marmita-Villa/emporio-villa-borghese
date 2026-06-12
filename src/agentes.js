@@ -4,6 +4,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { gerarToken, verificarToken, requireAdmin } = require('./auth');
 const { enviarMensagem } = require('./whatsapp');
 const { clearSession } = require('./session');
+const { saveSession } = require('./db');
+const { getOrCreateSession } = require('./session');
 const logger = require('./logger');
 
 const router = express.Router();
@@ -14,7 +16,6 @@ function getSupabase() {
 
 // ─── Auth ───
 
-// POST /api/auth/login
 router.post('/auth/login', async (req, res) => {
   const { email, senha } = req.body;
   if (!email || !senha) return res.status(400).json({ error: 'Email e senha obrigatórios' });
@@ -31,19 +32,16 @@ router.post('/auth/login', async (req, res) => {
   res.json({ token, agente: { id: agente.id, nome: agente.nome, email: agente.email, role: agente.role } });
 });
 
-// GET /api/auth/me
 router.get('/auth/me', verificarToken, (req, res) => res.json(req.agente));
 
 // ─── Agentes (admin) ───
 
-// GET /api/agentes
 router.get('/agentes', verificarToken, requireAdmin, async (req, res) => {
   const sb = getSupabase();
   const { data } = await sb.from('agents').select('id,nome,email,role,ativo,created_at').order('created_at');
   res.json(data || []);
 });
 
-// POST /api/agentes
 router.post('/agentes', verificarToken, requireAdmin, async (req, res) => {
   const { nome, email, senha, role = 'agent' } = req.body;
   if (!nome || !email || !senha) return res.status(400).json({ error: 'Nome, email e senha obrigatórios' });
@@ -53,11 +51,9 @@ router.post('/agentes', verificarToken, requireAdmin, async (req, res) => {
   const { data, error } = await sb.from('agents').insert({ nome, email: email.toLowerCase(), senha_hash, role }).select().single();
   if (error) return res.status(400).json({ error: error.message.includes('unique') ? 'Email já cadastrado' : error.message });
 
-  logger.info('Agente criado', { email, nome });
   res.json({ id: data.id, nome: data.nome, email: data.email, role: data.role, ativo: data.ativo });
 });
 
-// PATCH /api/agentes/:id
 router.patch('/agentes/:id', verificarToken, requireAdmin, async (req, res) => {
   const { ativo, nome, senha, role } = req.body;
   const update = {};
@@ -72,7 +68,6 @@ router.patch('/agentes/:id', verificarToken, requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-// DELETE /api/agentes/:id
 router.delete('/agentes/:id', verificarToken, requireAdmin, async (req, res) => {
   const sb = getSupabase();
   await sb.from('agents').update({ ativo: false }).eq('id', req.params.id);
@@ -81,12 +76,11 @@ router.delete('/agentes/:id', verificarToken, requireAdmin, async (req, res) => 
 
 // ─── Fila de atendimento ───
 
-// GET /api/fila — conversas aguardando atendente
 router.get('/fila', verificarToken, async (req, res) => {
   const sb = getSupabase();
   const { data } = await sb
     .from('conversations')
-    .select('phone,customer_name,status,assigned_name,human_started_at,updated_at')
+    .select('phone,customer_name,status,assigned_name,tags,human_started_at,updated_at')
     .in('status', ['aguardando', 'em_atendimento'])
     .order('updated_at', { ascending: true });
   res.json(data || []);
@@ -109,8 +103,45 @@ router.post('/conversa/:phone/assumir', verificarToken, async (req, res) => {
     human_started_at: new Date().toISOString(),
   }).eq('phone', phone);
 
+  // Atualiza sessão Redis para refletir que está em atendimento humano
+  try {
+    const session = await getOrCreateSession(phone);
+    session.step = 'humano';
+    session.transferredToHuman = true;
+    await saveSession(session);
+  } catch (_) {}
+
   logger.info('Conversa assumida', { phone, agente: req.agente.nome });
   res.json({ ok: true });
+});
+
+// POST /api/conversa/:phone/transferir — transfere para outro atendente
+router.post('/conversa/:phone/transferir', verificarToken, async (req, res) => {
+  const { phone } = req.params;
+  const { agente_id } = req.body;
+  if (!agente_id) return res.status(400).json({ error: 'agente_id obrigatório' });
+
+  const sb = getSupabase();
+
+  const { data: novoAgente } = await sb.from('agents').select('id,nome').eq('id', agente_id).eq('ativo', true).single();
+  if (!novoAgente) return res.status(404).json({ error: 'Atendente não encontrado' });
+
+  await sb.from('conversations').update({
+    assigned_to: novoAgente.id,
+    assigned_name: novoAgente.nome,
+  }).eq('phone', phone);
+
+  // Registra a transferência no histórico
+  await sb.from('human_messages').insert({
+    phone,
+    direction: 'out',
+    content: `🔄 Conversa transferida de ${req.agente.nome} para ${novoAgente.nome}`,
+    agent_id: req.agente.id,
+    agent_name: req.agente.nome,
+  });
+
+  logger.info('Conversa transferida', { phone, de: req.agente.nome, para: novoAgente.nome });
+  res.json({ ok: true, novoAgente: novoAgente.nome });
 });
 
 // GET /api/conversa/:phone/historico
@@ -130,7 +161,7 @@ router.get('/conversa/:phone/historico', verificarToken, async (req, res) => {
   });
 });
 
-// POST /api/conversa/:phone/mensagem — agente envia mensagem ao cliente
+// POST /api/conversa/:phone/mensagem — agente envia mensagem
 router.post('/conversa/:phone/mensagem', verificarToken, async (req, res) => {
   const { phone } = req.params;
   const { texto } = req.body;
@@ -153,6 +184,17 @@ router.post('/conversa/:phone/mensagem', verificarToken, async (req, res) => {
     logger.error('Erro ao enviar mensagem do agente', { error: err.message });
     res.status(500).json({ error: 'Erro ao enviar mensagem' });
   }
+});
+
+// POST /api/conversa/:phone/tags — atualiza etiquetas da conversa
+router.post('/conversa/:phone/tags', verificarToken, async (req, res) => {
+  const { phone } = req.params;
+  const { tags } = req.body; // array de strings
+  if (!Array.isArray(tags)) return res.status(400).json({ error: 'tags deve ser um array' });
+
+  const sb = getSupabase();
+  await sb.from('conversations').update({ tags }).eq('phone', phone);
+  res.json({ ok: true });
 });
 
 // POST /api/conversa/:phone/encerrar
@@ -180,11 +222,40 @@ router.get('/historico', verificarToken, async (req, res) => {
   const sb = getSupabase();
   const { data } = await sb
     .from('conversations')
-    .select('phone,customer_name,assigned_name,human_started_at,human_ended_at,updated_at')
+    .select('phone,customer_name,assigned_name,tags,human_started_at,human_ended_at,updated_at')
     .eq('status', 'encerrado')
     .order('human_ended_at', { ascending: false })
     .limit(50);
   res.json(data || []);
+});
+
+// ─── Respostas rápidas ───
+
+router.get('/respostas-rapidas', verificarToken, async (req, res) => {
+  const sb = getSupabase();
+  const { data } = await sb.from('quick_replies').select('*').order('atalho');
+  res.json(data || []);
+});
+
+router.post('/respostas-rapidas', verificarToken, requireAdmin, async (req, res) => {
+  const { atalho, texto } = req.body;
+  if (!atalho || !texto) return res.status(400).json({ error: 'Atalho e texto obrigatórios' });
+
+  const sb = getSupabase();
+  const { data, error } = await sb.from('quick_replies').insert({
+    atalho: atalho.trim(),
+    texto: texto.trim(),
+    created_by: req.agente.nome,
+  }).select().single();
+
+  if (error) return res.status(400).json({ error: error.message });
+  res.json(data);
+});
+
+router.delete('/respostas-rapidas/:id', verificarToken, requireAdmin, async (req, res) => {
+  const sb = getSupabase();
+  await sb.from('quick_replies').delete().eq('id', req.params.id);
+  res.json({ ok: true });
 });
 
 module.exports = router;

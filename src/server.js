@@ -124,9 +124,10 @@ app.get('/api/dashboard', async (req, res) => {
   const { createClient } = require('@supabase/supabase-js');
   const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
-  const [ordersRes, convsRes] = await Promise.all([
+  const [ordersRes, convsRes, humanConvsRes] = await Promise.all([
     sb.from('orders').select('*').gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
     sb.from('conversations').select('phone,customer_name,step,converted,transferred_to_human,created_at,started_at,updated_at').gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
+    sb.from('conversations').select('assigned_name,human_started_at,human_ended_at').not('assigned_name', 'is', null).not('human_started_at', 'is', null).gte('human_started_at', fromDate.toISOString()).lte('human_started_at', toDate.toISOString()),
   ]);
 
   const orders = ordersRes.data || [];
@@ -185,6 +186,28 @@ app.get('/api/dashboard', async (req, res) => {
   const porHora = Array(24).fill(0);
   for (const c of convs) { porHora[new Date(c.created_at).getHours()]++; }
 
+  // Relatório por atendente
+  const humanConvs = humanConvsRes.data || [];
+  const agentMap = {};
+  for (const c of humanConvs) {
+    const nome = c.assigned_name;
+    if (!nome) continue;
+    agentMap[nome] = agentMap[nome] || { nome, conversas: 0, tempoTotal: 0, comTempo: 0 };
+    agentMap[nome].conversas++;
+    if (c.human_started_at && c.human_ended_at) {
+      const dur = (new Date(c.human_ended_at) - new Date(c.human_started_at)) / 60000; // minutos
+      if (dur > 0 && dur < 480) { // ignora durações absurdas (>8h)
+        agentMap[nome].tempoTotal += dur;
+        agentMap[nome].comTempo++;
+      }
+    }
+  }
+  const relatorioAtendentes = Object.values(agentMap).map(a => ({
+    nome: a.nome,
+    conversas: a.conversas,
+    tempoMedio: a.comTempo > 0 ? Math.round(a.tempoTotal / a.comTempo) : null,
+  })).sort((a, b) => b.conversas - a.conversas);
+
   res.json({
     periodo: { from: fromDate, to: toDate },
     kpis: { totalVendido, totalPedidos, ticketMedio, totalAtendimentos, taxaConversao, transferidosHumano: transf },
@@ -193,6 +216,7 @@ app.get('/api/dashboard', async (req, res) => {
     vendasPorDia: Object.values(vendaDia).sort((a, b) => a.data.localeCompare(b.data)),
     pagamentos,
     atendimentosPorHora: porHora,
+    relatorioAtendentes,
     ultimosPedidos: [...orders].reverse().slice(0, 20).map(o => ({
       numero: o.order_number, cliente: o.customer_name, total: o.total,
       forma_pagamento: o.forma_pagamento, created_at: o.created_at,
