@@ -154,6 +154,13 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
     const result = `Produtos encontrados:\n${lista}\n\nUse verificar_estoque para confirmar disponibilidade antes de oferecer ao cliente.`;
 
     if (session.productCache) session.productCache[chave] = { result, ts: Date.now() };
+
+    // Salva mapa nome→{id,preco} na sessão para uso no rascunho de pedido
+    if (!session.productMap) session.productMap = {};
+    for (const p of produtos.slice(0, 8)) {
+      session.productMap[p.nome.toLowerCase()] = { id: p.id, nome: p.nome, preco: p.preco };
+    }
+
     return result;
   }
 
@@ -431,7 +438,24 @@ JSON esperado:
     const texto = response.content[0]?.text || '';
     const match = texto.match(/\{[\s\S]*\}/);
     if (!match) return null;
-    return JSON.parse(match[0]);
+    const resultado = JSON.parse(match[0]);
+
+    // Completa IDs ausentes usando o mapa de produtos da sessão
+    if (resultado.itens && session.productMap) {
+      for (const item of resultado.itens) {
+        if (!item.id) {
+          const chave = item.nome?.toLowerCase();
+          const encontrado = session.productMap[chave] ||
+            Object.values(session.productMap).find(p => chave?.includes(p.nome.toLowerCase()) || p.nome.toLowerCase().includes(chave));
+          if (encontrado) {
+            item.id = encontrado.id;
+            if (!item.preco) item.preco = encontrado.preco;
+          }
+        }
+      }
+    }
+
+    return resultado;
   } catch (err) {
     logger.warn('Erro ao extrair dados do pedido para transferência', { error: err.message });
     return null;
