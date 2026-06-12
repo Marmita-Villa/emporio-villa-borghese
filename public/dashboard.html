@@ -128,12 +128,12 @@
     .kpi-card .icon { font-size: 20px; margin-bottom: 8px; }
     .kpi-card .value { font-size: 24px; font-weight: 700; color: var(--laranja); }
     .kpi-card .label { font-size: 11px; color: var(--cinza-3); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-    .kpi-card.azul { border-left-color: #0984e3; } .kpi-card.azul .value { color: #0984e3; }
-    .kpi-card.verde { border-left-color: #00b894; } .kpi-card.verde .value { color: #00b894; }
-    .kpi-card.roxo { border-left-color: #6c5ce7; } .kpi-card.roxo .value { color: #6c5ce7; }
-    .kpi-card.vermelho { border-left-color: #e17055; } .kpi-card.vermelho .value { color: #e17055; }
-    .kpi-card.cinza { border-left-color: var(--cinza-3); } .kpi-card.cinza .value { color: var(--cinza-4); }
-    .kpi-card.dourado { border-left-color: #f39c12; } .kpi-card.dourado .value { color: #f39c12; }
+    .kpi-card.azul   { border-left-color: var(--laranja-mid); }   .kpi-card.azul .value   { color: var(--laranja-mid); }
+    .kpi-card.verde  { border-left-color: #7A3E14; }              .kpi-card.verde .value  { color: #7A3E14; }
+    .kpi-card.roxo   { border-left-color: var(--laranja-dark); }  .kpi-card.roxo .value   { color: var(--laranja-dark); }
+    .kpi-card.vermelho{ border-left-color: #8B4513; }             .kpi-card.vermelho .value{ color: #8B4513; }
+    .kpi-card.cinza  { border-left-color: var(--cinza-3); }       .kpi-card.cinza .value  { color: var(--cinza-4); }
+    .kpi-card.dourado{ border-left-color: var(--laranja); }       .kpi-card.dourado .value{ color: var(--laranja); }
 
     /* ── Grids de cards ── */
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 0; }
@@ -537,8 +537,8 @@
             <div style="font-size:22px;font-weight:700;color:var(--laranja)">${total}</div>
             <div style="font-size:11px;color:var(--cinza-3);margin-top:2px;text-transform:uppercase">Total conversas</div>
           </div>
-          <div style="background:var(--cinza-1);border-radius:10px;padding:14px;text-align:center">
-            <div style="font-size:22px;font-weight:700;color:#00b894">${conv}</div>
+          <div style="background:var(--laranja-pale);border-radius:10px;padding:14px;text-align:center">
+            <div style="font-size:22px;font-weight:700;color:var(--laranja-dark)">${conv}</div>
             <div style="font-size:11px;color:var(--cinza-3);margin-top:2px;text-transform:uppercase">Pedidos gerados</div>
           </div>
         </div>
@@ -546,19 +546,19 @@
           <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
             <span>🤖 Resolvidas pelo bot</span><strong>${bot} (${txBot}%)</strong>
           </div>
-          <div class="bar-wrap"><div class="bar-fill" style="width:${txBot}%;background:#6c5ce7"></div></div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${txBot}%;background:var(--laranja-dark)"></div></div>
         </div>
         <div>
           <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
             <span>✅ Taxa de conversão</span><strong>${txConv}%</strong>
           </div>
-          <div class="bar-wrap"><div class="bar-fill" style="width:${txConv}%;background:#00b894"></div></div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${txConv}%;background:var(--laranja)"></div></div>
         </div>
         <div>
           <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px">
             <span>👤 Transferidas p/ humano</span><strong>${transf} (${txTransf}%)</strong>
           </div>
-          <div class="bar-wrap"><div class="bar-fill" style="width:${txTransf}%;background:#e17055"></div></div>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${txTransf}%;background:var(--laranja-mid)"></div></div>
         </div>
       </div>`;
   }
