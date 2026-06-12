@@ -103,13 +103,18 @@ async function buscarCliente(identificador) {
 
   for (const params of tentativas) {
     try {
-      const res = await comRetry(() => api.get('/clientes/buscar', {
-        params: { ...params, incluir_historico: true },
-      }));
+      const res = await comRetry(() => api.get('/clientes/buscar', { params }));
       if (res.data) return res.data;
     } catch (err) {
-      if (err.response?.status === 404) continue; // tenta próxima opção
-      logger.error('Erro ao buscar cliente', { identificador, error: err.message });
+      const status = err.response?.status;
+      if (status === 404) continue;
+      logger.error('Erro ao buscar cliente', {
+        identificador,
+        status,
+        body: err.response?.data,
+        error: err.message,
+      });
+      if (status === 400) continue; // pode ser formato inválido — tenta próximo
       return null;
     }
   }
