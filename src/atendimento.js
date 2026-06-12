@@ -1,6 +1,67 @@
-const { processarComIA } = require('./ia');
+const { processarComIA, extrairDadosPedido } = require('./ia');
 const { getMsg } = require('./config');
 const logger = require('./logger');
+const { createClient } = require('@supabase/supabase-js');
+const apiModule = process.env.MOCK_MODE === 'true' ? require('./mockApi') : require('./sistemaApi');
+
+// ─── Gera rascunho do pedido e nota interna quando cliente solicita transferência ───
+async function gerarRascunhoPedido(session) {
+  try {
+    const dados = await extrairDadosPedido(session);
+    if (!dados || !dados.itens?.length) return;
+
+    const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+    let pedidoNumero = null;
+
+    // Tenta criar pedido na retaguarda se tiver os dados obrigatórios
+    const temDados = dados.itens.length > 0 && dados.endereco && dados.forma_pagamento;
+    if (temDados) {
+      try {
+        const total = dados.total || dados.itens.reduce((s, i) => s + (i.preco || 0) * (i.quantidade || 1), 0);
+        const pedido = await apiModule.criarPedido({
+          telefone: session.phone,
+          nomeCliente: dados.nome_cliente || session.customerName || 'Cliente WhatsApp',
+          endereco: dados.endereco,
+          itens: dados.itens.map(i => ({ id: i.id || '', nome: i.nome, quantidade: i.quantidade || 1, preco: i.preco || 0 })),
+          total,
+          formaPagamento: dados.forma_pagamento,
+          observacoes: `⚠️ Transferido do bot para atendente humano.${dados.observacoes ? ' ' + dados.observacoes : ''}`,
+        });
+        pedidoNumero = pedido.id || pedido.numero;
+        logger.info('Rascunho de pedido criado na retaguarda', { phone: session.phone, pedido: pedidoNumero });
+      } catch (err) {
+        logger.warn('Não foi possível criar rascunho na retaguarda', { phone: session.phone, error: err.message });
+      }
+    }
+
+    // Monta nota interna para o atendente
+    const itensList = dados.itens.map(i =>
+      `• ${i.quantidade || 1}x ${i.nome}${i.preco ? ` — R$ ${((i.preco) * (i.quantidade || 1)).toFixed(2)}` : ''}`
+    ).join('\n');
+
+    let nota = `📋 *Resumo coletado pelo bot:*\n${itensList}`;
+    if (dados.endereco)       nota += `\n📍 Endereço: ${dados.endereco}`;
+    if (dados.forma_pagamento) nota += `\n💳 Pagamento: ${dados.forma_pagamento}`;
+    if (dados.total)           nota += `\n💰 Total estimado: R$ ${Number(dados.total).toFixed(2)}`;
+    if (dados.observacoes)     nota += `\n📝 Obs: ${dados.observacoes}`;
+
+    if (pedidoNumero) {
+      nota += `\n\n✅ *Pedido #${pedidoNumero} criado na retaguarda. Confirmar com o cliente.*`;
+    } else {
+      const falta = dados.campos_faltando?.length ? dados.campos_faltando.join(', ') : 'endereço e/ou forma de pagamento';
+      nota += `\n\n⚠️ *Pedido NÃO criado automaticamente.*\nFalta coletar: ${falta}`;
+    }
+
+    await sb.from('human_messages').insert({
+      phone: session.phone,
+      direction: 'internal',
+      content: nota,
+      agent_name: 'Sistema',
+    });
+  } catch (err) {
+    logger.error('Erro em gerarRascunhoPedido', { phone: session.phone, error: err.message });
+  }
+}
 
 // ─── Roteador principal de atendimento ───
 async function processarMensagem(session, texto) {
@@ -73,6 +134,8 @@ async function processarMensagem(session, texto) {
     session.step = 'humano';
     session.transferredToHuman = true;
     logger.info('Cliente solicitou atendente humano no meio da conversa IA', { phone: session.phone });
+    // Gera rascunho do pedido e nota interna para o atendente (fire-and-forget)
+    gerarRascunhoPedido(session).catch(() => {});
     return `Claro! 😊 Vou chamar um atendente para você agora.\n\nAguarda um momento que alguém da nossa equipe vai assumir essa conversa aqui mesmo pelo WhatsApp. 🙌`;
   }
 

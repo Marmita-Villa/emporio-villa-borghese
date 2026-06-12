@@ -392,4 +392,50 @@ async function processarComIA(session, novaMensagem) {
   }
 }
 
-module.exports = { processarComIA };
+// ─── Extrai dados do pedido da conversa para transferência ao atendente ───
+async function extrairDadosPedido(session) {
+  if (!session.messages || session.messages.length < 2) return null;
+
+  // Monta texto da conversa filtrando apenas mensagens de texto (ignora tool_use blocks)
+  const conversa = session.messages
+    .filter(m => typeof m.content === 'string' && m.content.trim())
+    .map(m => `${m.role === 'user' ? 'Cliente' : 'Maithe'}: ${m.content}`)
+    .join('\n');
+
+  if (!conversa) return null;
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      messages: [{
+        role: 'user',
+        content: `Analise esta conversa de atendimento e extraia os dados do pedido. Retorne APENAS um JSON válido, sem markdown.
+
+CONVERSA:
+${conversa}
+
+JSON esperado:
+{
+  "nome_cliente": "nome ou null",
+  "itens": [{"nome": "string", "quantidade": 1, "preco": 0.0, "id": "id ou null"}],
+  "endereco": "endereço completo ou null",
+  "forma_pagamento": "pix/cartão/dinheiro ou null",
+  "observacoes": "obs do cliente ou null",
+  "total": 0.0,
+  "campos_faltando": ["lista de campos que ainda não foram informados"]
+}`,
+      }],
+    });
+
+    const texto = response.content[0]?.text || '';
+    const match = texto.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    return JSON.parse(match[0]);
+  } catch (err) {
+    logger.warn('Erro ao extrair dados do pedido para transferência', { error: err.message });
+    return null;
+  }
+}
+
+module.exports = { processarComIA, extrairDadosPedido };

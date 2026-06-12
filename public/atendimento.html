@@ -179,6 +179,9 @@
     .msg .msg-time { font-size: 10px; opacity: 0.55; text-align: right; margin-top: 4px; }
     .msg .msg-label { font-size: 10px; opacity: 0.65; margin-bottom: 3px; font-weight: 600; letter-spacing: 0.3px; }
     .divider { text-align: center; font-size: 11px; color: var(--cinza-3); margin: 10px 0; background: rgba(196,120,50,0.08); border-radius: 20px; padding: 4px 14px; align-self: center; letter-spacing: 0.3px; }
+    .msg-internal { align-self: center; max-width: 85%; background: #FFF8E1; border: 1.5px solid #F4C842; border-radius: 10px; padding: 10px 14px 7px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; color: #5C4400; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .msg-internal .msg-internal-label { font-size: 10px; font-weight: 700; color: #C47800; margin-bottom: 5px; letter-spacing: 0.3px; }
+    .msg-internal .msg-time { font-size: 10px; opacity: 0.55; text-align: right; margin-top: 4px; }
 
     .input-area { background: var(--branco); padding: 12px 14px; display: flex; gap: 10px; align-items: flex-end; flex-shrink: 0; border-top: 1px solid var(--cinza-2); }
     .input-area textarea {
@@ -659,6 +662,10 @@
           html += `<div class="divider">— Atendimento humano ${ehAtual ? '(atual)' : dataLabel} —</div>`;
         }
         for (const msg of sessoes[s]) {
+          if (msg.direction === 'internal') {
+            html += `<div class="msg-internal"><div class="msg-internal-label">📋 Nota do Sistema</div>${esc(msg.content)}<div class="msg-time">${hora(msg.created_at)}</div></div>`;
+            continue;
+          }
           const classe = msg.direction === 'out' ? 'agent' : 'client';
           const label = msg.direction === 'out' ? `👤 ${msg.agent_name}` : '👤 Cliente';
           html += `<div class="msg ${classe}"><div class="msg-label">${label}</div>${esc(msg.content)}<div class="msg-time">${hora(msg.created_at)}</div></div>`;
