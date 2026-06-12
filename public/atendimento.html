@@ -730,11 +730,67 @@
 
   // ── Histórico ──
   async function carregarHistorico() {
-    const data = await api('/historico');
+    const de   = document.getElementById('hist-de')?.value   || '';
+    const ate  = document.getElementById('hist-ate')?.value  || '';
+    const nome = document.getElementById('hist-nome')?.value || '';
+
+    let qs = '';
+    if (de)   qs += `&de=${de}`;
+    if (ate)  qs += `&ate=${ate}`;
+    if (nome) qs += `&nome=${encodeURIComponent(nome)}`;
+
+    const data = await api('/historico?' + qs.slice(1));
     const el = document.getElementById('historico-content');
-    if (!data?.length) { el.innerHTML = '<div style="text-align:center;padding:48px;color:#b2bec3">Nenhuma conversa encerrada ainda</div>'; return; }
-    el.innerHTML = `
+
+    const isAdmin = agente.role === 'admin';
+    const hoje = new Date().toISOString().slice(0, 10);
+
+    const filtros = `
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:20px">
+        <div>
+          <div style="font-size:11px;color:var(--cinza-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">De</div>
+          <input type="date" id="hist-de" value="${de}" onchange="carregarHistorico()"
+            style="border:1.5px solid var(--cinza-2);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;background:var(--creme)">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--cinza-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Até</div>
+          <input type="date" id="hist-ate" value="${ate}" onchange="carregarHistorico()"
+            style="border:1.5px solid var(--cinza-2);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;background:var(--creme)">
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--cinza-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Cliente</div>
+          <input type="text" id="hist-nome" value="${nome}" placeholder="Buscar por nome..."
+            oninput="clearTimeout(window._ht);window._ht=setTimeout(carregarHistorico,400)"
+            style="border:1.5px solid var(--cinza-2);border-radius:8px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;background:var(--creme);width:200px">
+        </div>
+        <button onclick="limparFiltrosHistorico()"
+          style="padding:8px 16px;border:1.5px solid var(--cinza-2);border-radius:8px;font-size:13px;background:white;cursor:pointer;font-family:inherit;color:var(--cinza-4)">
+          Limpar
+        </button>
+        ${isAdmin ? `
+        <div style="margin-left:auto">
+          <div style="font-size:11px;color:var(--cinza-3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Excluir anteriores a</div>
+          <div style="display:flex;gap:8px">
+            <input type="date" id="hist-excluir-ate" max="${hoje}"
+              style="border:1.5px solid #fcd7d7;border-radius:8px;padding:8px 12px;font-size:13px;outline:none;font-family:inherit;background:#fff8f8">
+            <button onclick="excluirHistorico()"
+              style="padding:8px 16px;background:#c0392b;color:white;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+              🗑️ Excluir
+            </button>
+          </div>
+        </div>` : ''}
+      </div>`;
+
+    if (!data?.length) {
+      el.innerHTML = filtros + '<div style="text-align:center;padding:48px;color:#b2bec3">Nenhuma conversa encontrada</div>';
+      return;
+    }
+
+    el.innerHTML = filtros + `
       <div style="background:white;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,0.08);overflow:hidden">
+        <div style="padding:12px 16px;background:var(--creme);border-bottom:1px solid var(--cinza-1);font-size:12px;color:var(--cinza-3)">
+          ${data.length} conversa${data.length !== 1 ? 's' : ''} encontrada${data.length !== 1 ? 's' : ''}
+        </div>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
           <thead><tr style="border-bottom:1px solid #f0f0f0">
             <th style="padding:12px 16px;text-align:left;color:#636e72;font-size:11px;text-transform:uppercase">Cliente</th>
@@ -754,6 +810,23 @@
           </tr>`).join('')}</tbody>
         </table>
       </div>`;
+  }
+
+  function limparFiltrosHistorico() {
+    document.getElementById('hist-de').value = '';
+    document.getElementById('hist-ate').value = '';
+    document.getElementById('hist-nome').value = '';
+    carregarHistorico();
+  }
+
+  async function excluirHistorico() {
+    const ate = document.getElementById('hist-excluir-ate').value;
+    if (!ate) { alert('Selecione uma data limite para exclusão.'); return; }
+    if (!confirm(`Excluir permanentemente todas as conversas encerradas antes de ${ate}?\n\nEssa ação não pode ser desfeita.`)) return;
+    const res = await api(`/historico/excluir?ate=${ate}`, { method: 'DELETE' });
+    if (res.error) { alert('Erro: ' + res.error); return; }
+    alert(`${res.excluidos} registro(s) excluído(s).`);
+    carregarHistorico();
   }
 
   // ── Modal histórico de conversa ──

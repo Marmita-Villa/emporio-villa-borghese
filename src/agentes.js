@@ -236,15 +236,40 @@ router.post('/conversa/:phone/encerrar', verificarToken, async (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/historico — conversas encerradas (tabela permanente)
+// GET /api/historico — conversas encerradas com filtros
 router.get('/historico', verificarToken, async (req, res) => {
+  const { de, ate, nome } = req.query;
   const sb = getSupabase();
-  const { data } = await sb
+
+  let query = sb
     .from('conversation_history')
     .select('phone,customer_name,assigned_name,tags,human_started_at,human_ended_at,encerrado_por')
     .order('human_ended_at', { ascending: false })
-    .limit(100);
+    .limit(200);
+
+  if (de)   query = query.gte('human_ended_at', de + 'T00:00:00');
+  if (ate)  query = query.lte('human_ended_at', ate + 'T23:59:59');
+  if (nome) query = query.ilike('customer_name', `%${nome}%`);
+
+  const { data } = await query;
   res.json(data || []);
+});
+
+// DELETE /api/historico/excluir — exclui registros anteriores a uma data (admin only)
+router.delete('/historico/excluir', verificarToken, requireAdmin, async (req, res) => {
+  const { ate } = req.query;
+  if (!ate) return res.status(400).json({ error: 'Parâmetro "ate" obrigatório' });
+
+  const sb = getSupabase();
+  const { data, error } = await sb
+    .from('conversation_history')
+    .delete()
+    .lt('human_ended_at', ate + 'T00:00:00')
+    .select('id');
+
+  if (error) return res.status(500).json({ error: error.message });
+  logger.info('Histórico excluído', { ate, excluidos: data?.length, por: req.agente.nome });
+  res.json({ ok: true, excluidos: data?.length || 0 });
 });
 
 // ─── Respostas rápidas ───
