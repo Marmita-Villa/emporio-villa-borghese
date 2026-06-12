@@ -65,7 +65,7 @@ const tools = [
   },
   {
     name: 'finalizar_pedido',
-    description: 'Finaliza e registra o pedido no sistema quando o cliente confirmar. Só use após confirmação explícita do cliente.',
+    description: 'OBRIGATÓRIO: registra o pedido no sistema. DEVE ser chamada imediatamente quando o cliente confirmar o pedido (disser "sim", "pode confirmar", "fechado", etc). NUNCA diga que o pedido foi confirmado sem antes chamar esta ferramenta.',
     input_schema: {
       type: 'object',
       properties: {
@@ -371,7 +371,7 @@ async function processarComIA(session, novaMensagem) {
   while (true) {
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 600,
+      max_tokens: 1024,
       system: getSystemPrompt(),
       tools,
       messages,
