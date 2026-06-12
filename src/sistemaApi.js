@@ -1,4 +1,5 @@
 const axios = require('axios');
+const https = require('https');
 const logger = require('./logger');
 
 // ─── Cliente HTTP — base: https://api.emporiovillaborghese.com.br ───
@@ -8,7 +9,9 @@ const api = axios.create({
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${process.env.SISTEMA_API_TOKEN}`,
   },
-  timeout: 3000,
+  timeout: 8000,
+  // Desativa keep-alive para garantir que o timeout funcione corretamente
+  httpsAgent: new https.Agent({ keepAlive: false }),
 });
 
 // ─── Cache simples em memória (TTL 5 min) ───
@@ -88,7 +91,7 @@ async function verificarEstoque(produtoId) {
   const cached = cacheGet(chave);
   if (cached) return cached;
   try {
-    const res = await api.get(`/produtos/${produtoId}/estoque`, { timeout: 2500 });
+    const res = await api.get(`/produtos/${produtoId}/estoque`);
     cacheSet(chave, res.data);
     return res.data;
   } catch (err) {
