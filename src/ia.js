@@ -373,7 +373,7 @@ async function processarComIA(session, novaMensagem) {
   // Loop de ferramenta: a IA pode chamar várias ferramentas antes de responder
   while (true) {
     const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-5',
       max_tokens: 1024,
       system: getSystemPrompt(),
       tools,
