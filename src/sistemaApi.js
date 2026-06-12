@@ -85,27 +85,35 @@ async function verificarEstoque(produtoId) {
 // Params: cpf (sem pontuação), telefone (com DDD), nome, incluir_historico
 // Resposta: { id, nome, cpf, telefone, endereco, forma_pagamento_preferida, ... }
 async function buscarCliente(identificador) {
-  try {
-    const apenasNumeros = identificador.replace(/\D/g, '');
-    let params = {};
+  const apenasNumeros = identificador.replace(/\D/g, '');
 
-    if (apenasNumeros.length === 11) {
-      params = { cpf: apenasNumeros };           // CPF: exatamente 11 dígitos sem pontuação
-    } else if (apenasNumeros.length >= 8) {
-      params = { telefone: apenasNumeros };      // Telefone com DDD
-    } else {
-      params = { nome: removerAcentos(identificador) }; // Nome parcial sem acentos
-    }
-
-    const res = await comRetry(() => api.get('/clientes/buscar', {
-      params: { ...params, incluir_historico: true },
-    }));
-    return res.data || null;
-  } catch (err) {
-    if (err.response?.status === 404) return null;
-    logger.error('Erro ao buscar cliente', { identificador, error: err.message });
-    return null;
+  // Monta lista de tentativas — telefone tem prioridade sobre CPF quando ambíguo (11 dígitos)
+  const tentativas = [];
+  if (apenasNumeros.length >= 10 && apenasNumeros.length <= 11) {
+    tentativas.push({ telefone: apenasNumeros });           // tenta como telefone primeiro
   }
+  if (apenasNumeros.length === 11) {
+    tentativas.push({ cpf: apenasNumeros });                // fallback: pode ser CPF
+  } else if (apenasNumeros.length >= 8) {
+    tentativas.push({ telefone: apenasNumeros });
+  }
+  if (!tentativas.length) {
+    tentativas.push({ nome: removerAcentos(identificador) });
+  }
+
+  for (const params of tentativas) {
+    try {
+      const res = await comRetry(() => api.get('/clientes/buscar', {
+        params: { ...params, incluir_historico: true },
+      }));
+      if (res.data) return res.data;
+    } catch (err) {
+      if (err.response?.status === 404) continue; // tenta próxima opção
+      logger.error('Erro ao buscar cliente', { identificador, error: err.message });
+      return null;
+    }
+  }
+  return null;
 }
 
 // ─── C.1 — Cria pedido na retaguarda ───
