@@ -219,6 +219,20 @@
       <div id="historico-content"></div>
     </div>
 
+    <!-- Modal conversa histórico -->
+    <div id="modal-conversa" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center">
+      <div style="background:white;border-radius:14px;width:640px;max-width:95vw;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,0.25)">
+        <div style="padding:20px 24px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div id="modal-nome" style="font-weight:700;font-size:16px"></div>
+            <div id="modal-phone" style="font-size:12px;color:#636e72"></div>
+          </div>
+          <button onclick="fecharModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#636e72;padding:4px 8px">✕</button>
+        </div>
+        <div id="modal-msgs" style="flex:1;overflow-y:auto;padding:16px 24px;display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+    </div>
+
     <!-- Agentes (admin) -->
     <div id="view-agentes" style="display:none; flex:1">
       <div class="admin-panel">
@@ -511,6 +525,7 @@
             <th style="padding:12px 16px;text-align:left;color:#636e72;font-size:11px;text-transform:uppercase">Atendente</th>
             <th style="padding:12px 16px;text-align:left;color:#636e72;font-size:11px;text-transform:uppercase">Início</th>
             <th style="padding:12px 16px;text-align:left;color:#636e72;font-size:11px;text-transform:uppercase">Encerrado</th>
+            <th style="padding:12px 16px"></th>
           </tr></thead>
           <tbody>${data.map(c => `<tr style="border-bottom:1px solid #f8f9fa">
             <td style="padding:12px 16px;font-weight:600">${c.customer_name || '—'}</td>
@@ -518,10 +533,61 @@
             <td style="padding:12px 16px">${c.assigned_name || '—'}</td>
             <td style="padding:12px 16px;color:#636e72;font-size:12px">${c.human_started_at ? fmtDt(c.human_started_at) : '—'}</td>
             <td style="padding:12px 16px;color:#636e72;font-size:12px">${c.human_ended_at ? fmtDt(c.human_ended_at) : '—'}</td>
+            <td style="padding:8px 16px"><button onclick="verConversa('${c.phone}','${(c.customer_name||'Cliente').replace(/'/g,"\\'")}' )" style="background:#075E54;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer">Ver</button></td>
           </tr>`).join('')}</tbody>
         </table>
       </div>`;
   }
+
+  // ── Modal histórico de conversa ──
+  async function verConversa(phone, nome) {
+    document.getElementById('modal-nome').textContent = nome;
+    document.getElementById('modal-phone').textContent = phone;
+    document.getElementById('modal-msgs').innerHTML = '<div style="text-align:center;padding:24px;color:#b2bec3">Carregando...</div>';
+    document.getElementById('modal-conversa').style.display = 'flex';
+
+    const data = await api(`/conversa/${phone}/historico`);
+    const el = document.getElementById('modal-msgs');
+    if (!data) { el.innerHTML = '<div style="color:#e17055">Erro ao carregar conversa.</div>'; return; }
+
+    const { botMessages = [], humanMessages = [] } = data;
+    let html = '';
+
+    if (botMessages.length) {
+      html += '<div style="font-size:11px;text-transform:uppercase;color:#b2bec3;margin:8px 0 4px">— Histórico do bot —</div>';
+      for (const msg of botMessages) {
+        const isClient = msg.role === 'user';
+        html += `<div style="display:flex;flex-direction:column;align-items:${isClient ? 'flex-start' : 'flex-end'}">
+          <div style="font-size:11px;color:#b2bec3;margin-bottom:2px">${isClient ? '👤 Cliente' : '🤖 Maithe'}</div>
+          <div style="background:${isClient ? '#f1f3f4' : '#dcf8c6'};padding:8px 12px;border-radius:10px;max-width:80%;font-size:13px;white-space:pre-wrap">${esc(msg.content)}</div>
+        </div>`;
+      }
+    }
+
+    if (humanMessages.length) {
+      html += '<div style="font-size:11px;text-transform:uppercase;color:#b2bec3;margin:12px 0 4px">— Atendimento humano —</div>';
+      for (const msg of humanMessages) {
+        const isAgent = msg.direction === 'out';
+        html += `<div style="display:flex;flex-direction:column;align-items:${isAgent ? 'flex-end' : 'flex-start'}">
+          <div style="font-size:11px;color:#b2bec3;margin-bottom:2px">${isAgent ? `👤 ${msg.agent_name}` : '👤 Cliente'} · ${hora(msg.created_at)}</div>
+          <div style="background:${isAgent ? '#075E54' : '#f1f3f4'};color:${isAgent ? 'white' : 'inherit'};padding:8px 12px;border-radius:10px;max-width:80%;font-size:13px;white-space:pre-wrap">${esc(msg.content)}</div>
+        </div>`;
+      }
+    }
+
+    if (!html) html = '<div style="text-align:center;padding:24px;color:#b2bec3">Sem mensagens registradas.</div>';
+    el.innerHTML = html;
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function fecharModal() {
+    document.getElementById('modal-conversa').style.display = 'none';
+  }
+
+  // Fecha modal clicando fora
+  document.getElementById('modal-conversa').addEventListener('click', function(e) {
+    if (e.target === this) fecharModal();
+  });
 
   // ── Admin: Agentes ──
   async function carregarAgentes() {
