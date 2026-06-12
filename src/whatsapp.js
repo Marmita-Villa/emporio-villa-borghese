@@ -1,6 +1,6 @@
 const axios = require('axios');
 const { getOrCreateSession } = require('./session');
-const { saveSession, salvarMensagemHumana } = require('./db');
+const { saveSession, salvarConversa, salvarMensagemHumana } = require('./db');
 const { processarMensagem } = require('./atendimento');
 const logger = require('./logger');
 
@@ -59,8 +59,9 @@ async function handleIncomingMessage(phone, texto) {
   try {
     const resposta = await processarMensagem(session, texto);
 
-    // Persiste mudanças de step e dados do cliente no Redis
+    // Persiste sessão no Redis e Supabase após qualquer mudança de step
     await saveSession(session);
+    salvarConversa(session).catch(() => {});
 
     if (Array.isArray(resposta)) {
       for (const msg of resposta) {
