@@ -390,6 +390,11 @@
   }
 
   async function carregarMensagens(phone) {
+    // Salva estado do input ANTES de qualquer re-render
+    const inputAntes = document.getElementById('msg-input');
+    const textoSalvo = inputAntes ? inputAntes.value : null;
+    const estavafocado = document.activeElement === inputAntes;
+
     const data = await api(`/conversa/${phone}/historico`);
     if (!data || !data.conversa) return;
 
@@ -399,25 +404,29 @@
     const inputContainer = document.getElementById('input-container');
     const scrollBottom = area.scrollHeight - area.scrollTop === area.clientHeight;
 
-    // Botões de ação
-    if (conversa.status === 'aguardando') {
-      actions.innerHTML = `<button class="btn-assumir" onclick="assumirConversa('${phone}')">✋ Assumir</button>`;
-      inputContainer.innerHTML = `<div class="input-blocked">Assuma a conversa para responder</div>`;
-    } else if (conversa.status === 'em_atendimento' && conversa.assigned_name === agente.nome) {
+    // Input e botões
+    const meuAtendimento = conversa.status === 'em_atendimento';
+    if (meuAtendimento) {
       actions.innerHTML = `<button class="btn-encerrar" onclick="encerrarConversa('${phone}')">✅ Encerrar</button>`;
-      inputContainer.innerHTML = `
-        <div class="input-area">
-          <textarea id="msg-input" placeholder="Digite sua mensagem..." rows="1"
-            oninput="autoResize(this)"
-            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensagem('${phone}')}"></textarea>
-          <button onclick="enviarMensagem('${phone}')">&#9658;</button>
-        </div>`;
-    } else if (conversa.status === 'em_atendimento') {
-      actions.innerHTML = '';
-      inputContainer.innerHTML = `<div class="input-blocked">Em atendimento com ${conversa.assigned_name}</div>`;
+      if (!document.getElementById('msg-input')) {
+        inputContainer.innerHTML = `
+          <div class="input-area">
+            <textarea id="msg-input" placeholder="Digite sua mensagem..." rows="1"
+              oninput="autoResize(this)"
+              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();enviarMensagem('${phone}')}"></textarea>
+            <button onclick="enviarMensagem('${phone}')">&#9658;</button>
+          </div>`;
+      }
+    } else if (conversa.status === 'aguardando') {
+      actions.innerHTML = `<button class="btn-assumir" onclick="assumirConversa('${phone}')">✋ Assumir</button>`;
+      if (!inputContainer.querySelector('.input-blocked')) {
+        inputContainer.innerHTML = `<div class="input-blocked">Assuma a conversa para responder</div>`;
+      }
     } else {
       actions.innerHTML = '';
-      inputContainer.innerHTML = `<div class="input-blocked">Conversa encerrada</div>`;
+      if (!inputContainer.querySelector('.input-blocked')) {
+        inputContainer.innerHTML = `<div class="input-blocked">Conversa encerrada</div>`;
+      }
     }
 
     // Mensagens
@@ -440,6 +449,13 @@
     area.innerHTML = html;
     if (scrollBottom || area.scrollHeight - area.scrollTop < area.clientHeight + 200) {
       area.scrollTop = area.scrollHeight;
+    }
+
+    // Restaura o que estava sendo digitado e o foco — a prova de qualquer re-render
+    const inputDepois = document.getElementById('msg-input');
+    if (inputDepois && textoSalvo !== null) {
+      inputDepois.value = textoSalvo;
+      if (estavafocado) inputDepois.focus();
     }
   }
 
