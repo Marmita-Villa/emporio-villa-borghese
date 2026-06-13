@@ -1,5 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
-const apiModule = process.env.MOCK_MODE === 'true' ? require('./mockApi') : require('./sistemaApi');
+const apiModule = process.env.MOCK_MODE === 'true' ? require('./mockApi') : require('./sistemaApiAdapter');
 const { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente } = apiModule;
 const { saveSession, salvarConversa, salvarPedido } = require('./db');
 const logger = require('./logger');

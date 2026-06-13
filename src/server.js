@@ -6,6 +6,7 @@ const logger = require('./logger');
 const { getOrCreateSession, clearSession, verificarSessoesExpiradas } = require('./session');
 const { saveSession, salvarConversa } = require('./db');
 const agentesRouter = require('./agentes');
+const webhookEventos = require('./webhookEventos');
 const { processarMensagem } = require('./atendimento');
 const { getMsg } = require('./config');
 
@@ -294,6 +295,7 @@ app.post('/nova-conversa', async (req, res) => {
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, '../public/dashboard.html')));
 app.get('/atendimento', (req, res) => res.sendFile(path.join(__dirname, '../public/atendimento.html')));
 app.use('/api', agentesRouter);
+app.use('/webhook', webhookEventos); // eventos da nova API (pedido.status_mudou, pix_gerado, etc.)
 app.use(express.static(path.join(__dirname, '../public')));
 
 // ─── Monitor de sessões inativas (verifica a cada 2 minutos) ───
