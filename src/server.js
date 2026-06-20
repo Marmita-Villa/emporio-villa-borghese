@@ -292,6 +292,18 @@ app.post('/nova-conversa', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Sync manual de clientes Hipcom (debug) ───
+app.post('/admin/sync-clientes', async (req, res) => {
+  if (req.query.key !== process.env.DASHBOARD_KEY) return res.status(401).json({ error: 'Não autorizado' });
+  try {
+    const { sincronizarClientes } = require('./hipcomSync');
+    res.json({ ok: true, mensagem: 'Sync iniciado em background' });
+    await sincronizarClientes();
+  } catch (err) {
+    logger.error('Erro no sync manual', { error: err.message });
+  }
+});
+
 // ─── Rotas das interfaces web ───
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, '../public/dashboard.html')));
 app.get('/atendimento', (req, res) => res.sendFile(path.join(__dirname, '../public/atendimento.html')));
