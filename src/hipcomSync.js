@@ -75,7 +75,7 @@ async function upsertClientes(clientes) {
     data_ultima_alteracao: c.data_ultima_alteracao || null,
   }));
   const { error } = await sb.from('hipcom_clientes').upsert(rows, { onConflict: 'codigo,loja' });
-  if (error) logger.error('hipcomSync: erro no upsert', { error: error.message });
+  if (error) throw new Error(`Upsert falhou: ${error.message} | code: ${error.code}`);
 }
 
 // ─── Sync principal ───
@@ -91,12 +91,7 @@ async function sincronizarClientes() {
 
   while (true) {
     let pagina;
-    try {
-      pagina = await fetchPagina(offset, ultimaSync);
-    } catch (err) {
-      logger.error('hipcomSync: erro ao buscar pagina', { offset, error: err.message });
-      break;
-    }
+    pagina = await fetchPagina(offset, ultimaSync);
 
     if (!pagina.length) break;
 
