@@ -7,8 +7,10 @@
  */
 
 const axios = require('axios');
-const { supabase: sb } = require('./db');
+const { createClient } = require('@supabase/supabase-js');
 const logger = require('./logger');
+
+const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
 
 const HIPCOM_URL    = process.env.HIPCOM_URL    || 'http://emporiovilla.dyndns.info:2222/api/hipcom';
 const HIPCOM_USER   = process.env.HIPCOM_USER   || 'hipcomfull';
