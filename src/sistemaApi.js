@@ -108,21 +108,16 @@ async function getProdutos() {
   }
 }
 
-// ─── A.2 — Verifica estoque somando lojas 1 e 6 ───
+// ─── A.2 — Verifica estoque via qtd_estoque_atual do endpoint de produtos ───
 async function verificarEstoque(produtoId) {
   const chave = `estoque:${produtoId}`;
   const cached = cacheGet(chave);
   if (cached) return cached;
   try {
-    const ontem = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    const resultados = await Promise.all(
-      HIPCOM_LOJAS_ESTOQUE.map(loja =>
-        hipcom.get('/estoquesprodutos', { params: { loja, data: ontem, plu: produtoId } })
-          .then(r => r.data?.estoques?.[0]?.quantidade_total || 0)
-          .catch(() => 0)
-      )
-    );
-    const quantidade = resultados.reduce((a, b) => a + b, 0);
+    const res = await hipcom.get('/produtos', { params: { loja: HIPCOM_LOJA_PRECO, plu: produtoId } });
+    const produto = res.data?.produtos?.[0];
+    if (!produto) return { disponivel: true, quantidade: -1 };
+    const quantidade = produto.qtd_estoque_atual || 0;
     const result = { disponivel: quantidade > 0, quantidade };
     cacheSet(chave, result);
     return result;
