@@ -114,10 +114,10 @@ async function verificarEstoque(produtoId) {
   const cached = cacheGet(chave);
   if (cached) return cached;
   try {
-    const hoje = new Date().toISOString().slice(0, 10);
+    const ontem = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
     const resultados = await Promise.all(
       HIPCOM_LOJAS_ESTOQUE.map(loja =>
-        hipcom.get('/estoquesprodutos', { params: { loja, data: hoje, plu: produtoId } })
+        hipcom.get('/estoquesprodutos', { params: { loja, data: ontem, plu: produtoId } })
           .then(r => r.data?.estoques?.[0]?.quantidade_total || 0)
           .catch(() => 0)
       )
