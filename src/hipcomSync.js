@@ -119,7 +119,7 @@ async function buscarClienteLocal(identificador) {
       .from('hipcom_clientes')
       .select('*')
       .eq('cpfcnpj', apenasNums)
-      .eq('loja', HIPCOM_LOJA)
+      .gte('loja', 1)
       .limit(1)
       .single();
     if (data) return normalizado(data);
@@ -131,7 +131,7 @@ async function buscarClienteLocal(identificador) {
       .from('hipcom_clientes')
       .select('*')
       .or(`telefone.eq.${apenasNums},telefone_secundario.eq.${apenasNums}`)
-      .eq('loja', HIPCOM_LOJA)
+      .gte('loja', 1)
       .limit(1)
       .single();
     if (data) return normalizado(data);
@@ -143,7 +143,7 @@ async function buscarClienteLocal(identificador) {
       .from('hipcom_clientes')
       .select('*')
       .ilike('nome', `%${identificador}%`)
-      .eq('loja', HIPCOM_LOJA)
+      .gte('loja', 1)
       .limit(1)
       .single();
     if (data) return normalizado(data);
