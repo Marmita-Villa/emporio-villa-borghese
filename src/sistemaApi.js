@@ -2,7 +2,7 @@ const axios = require('axios');
 const https = require('https');
 const logger = require('./logger');
 
-// ─── Cliente HTTP — base: https://api.emporiovillaborghese.com.br ───
+// ─── Cliente HTTP — retaguarda (pedidos) ───
 const api = axios.create({
   baseURL: process.env.SISTEMA_API_URL || 'https://api.emporiovillaborghese.com.br',
   headers: {
@@ -10,9 +10,23 @@ const api = axios.create({
     'Authorization': `Bearer ${process.env.SISTEMA_API_TOKEN}`,
   },
   timeout: 8000,
-  // Desativa keep-alive para garantir que o timeout funcione corretamente
   httpsAgent: new https.Agent({ keepAlive: false }),
 });
+
+// ─── Cliente HTTP — Hipcom (produtos, estoque) ───
+const hipcom = axios.create({
+  baseURL: process.env.HIPCOM_URL || 'http://emporiovilla.dyndns.info:2222/api/hipcom',
+  auth: {
+    username: process.env.HIPCOM_USER || 'hipcomfull',
+    password: process.env.HIPCOM_PASS || '',
+  },
+  timeout: 10000,
+  httpsAgent: new https.Agent({ keepAlive: false }),
+});
+
+const HIPCOM_LOJA_PRECO  = parseInt(process.env.HIPCOM_PRICE_STORE  || '6', 10);
+const HIPCOM_LOJAS_ESTOQUE = (process.env.HIPCOM_STOCK_STORES || '1,6').split(',').map(Number).filter(Boolean);
+const HIPCOM_BLOCKED     = (process.env.HIPCOM_BLOCKED_ITEMS || '').split(',').map(s => s.trim()).filter(Boolean);
 
 // ─── Cache simples em memória (TTL 5 min) ───
 const _cache = new Map();
@@ -50,53 +64,70 @@ function pareceCodBarras(termo) {
   return /^\d{8,13}$/.test(termo.trim());
 }
 
-// ─── A.1 — Busca produtos por nome, SKU ou EAN ───
-// GET /produtos/buscar
-// Params: q (nome parcial), ean (código de barras), campos, limit, page
+// ─── A.1 — Busca produtos por nome ou código de barras via Hipcom ───
 async function buscarProduto(termo) {
-  const chave = `prod:${removerAcentos(termo.trim().toLowerCase())}`;
+  const chave = `prod:${termo.trim().toLowerCase()}`;
   const cached = cacheGet(chave);
   if (cached) return cached;
   try {
-    const termoLimpo = removerAcentos(termo.trim());
+    const termoLimpo = termo.trim();
     const params = pareceCodBarras(termoLimpo)
-      ? { ean: termoLimpo, campos: 'id,nome,preco,ean' }
-      : { q: termoLimpo, campos: 'id,nome,preco,ean', limit: 8 };
+      ? { loja: HIPCOM_LOJA_PRECO, plu: termoLimpo, somente_estoque_positivo: 'S' }
+      : { loja: HIPCOM_LOJA_PRECO, descricao: termoLimpo, somente_estoque_positivo: 'S', limite: 8 };
 
-    const res = await comRetry(() => api.get('/produtos/buscar', { params }));
-    const result = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : []);
-    cacheSet(chave, result);
-    return result;
+    const res = await hipcom.get('/produtos', { params });
+    const produtos = (res.data?.produtos || [])
+      .filter(p => p.ativo === 'S' && !HIPCOM_BLOCKED.includes(String(p.plu)))
+      .map(p => ({
+        id:    String(p.plu),
+        nome:  p.descricao,
+        preco: p.valor_promocao > 0 ? p.valor_promocao : p.valor_produto,
+        ean:   p.codigo_barra ? String(p.codigo_barra) : null,
+      }));
+
+    cacheSet(chave, produtos);
+    return produtos;
   } catch (err) {
-    logger.error('Erro ao buscar produto', { termo, error: err.message });
+    logger.error('Erro ao buscar produto no Hipcom', { termo, error: err.message });
     return [];
   }
 }
 
-// ─── A.1 — Alias para listagem geral (não usada pela IA mas exportada por compatibilidade) ───
+// ─── A.1 — Alias para listagem geral ───
 async function getProdutos() {
   try {
-    const res = await api.get('/produtos/buscar', { params: { limit: 'all', campos: 'id,nome,preco,estoque' } });
-    return Array.isArray(res.data) ? res.data : [];
+    const res = await hipcom.get('/produtos', { params: { loja: HIPCOM_LOJA_PRECO, somente_estoque_positivo: 'S', limite: 100 } });
+    return (res.data?.produtos || []).map(p => ({
+      id:    String(p.plu),
+      nome:  p.descricao,
+      preco: p.valor_promocao > 0 ? p.valor_promocao : p.valor_produto,
+    }));
   } catch (err) {
-    logger.error('Erro ao listar produtos', { error: err.message });
+    logger.error('Erro ao listar produtos no Hipcom', { error: err.message });
     return [];
   }
 }
 
-// ─── A.2 — Verifica estoque de um produto específico ───
-// GET /produtos/:id/estoque  →  { "disponivel": true, "quantidade": 99999 }
+// ─── A.2 — Verifica estoque somando lojas 1 e 6 ───
 async function verificarEstoque(produtoId) {
   const chave = `estoque:${produtoId}`;
   const cached = cacheGet(chave);
   if (cached) return cached;
   try {
-    const res = await api.get(`/produtos/${produtoId}/estoque`);
-    cacheSet(chave, res.data);
-    return res.data;
+    const hoje = new Date().toISOString().slice(0, 10);
+    const resultados = await Promise.all(
+      HIPCOM_LOJAS_ESTOQUE.map(loja =>
+        hipcom.get('/estoquesprodutos', { params: { loja, data: hoje, plu: produtoId } })
+          .then(r => r.data?.estoques?.[0]?.quantidade_total || 0)
+          .catch(() => 0)
+      )
+    );
+    const quantidade = resultados.reduce((a, b) => a + b, 0);
+    const result = { disponivel: quantidade > 0, quantidade };
+    cacheSet(chave, result);
+    return result;
   } catch (err) {
-    // Qualquer erro (timeout, 400, 404) → assume disponível para não bloquear venda
-    logger.warn('verificar_estoque falhou, assumindo disponível', { produtoId, status: err.response?.status, error: err.message });
+    logger.warn('verificar_estoque Hipcom falhou, assumindo disponível', { produtoId, error: err.message });
     return { disponivel: true, quantidade: -1, erro: true };
   }
 }
