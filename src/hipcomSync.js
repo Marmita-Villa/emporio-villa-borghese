@@ -7,7 +7,7 @@
  */
 
 const axios = require('axios');
-const { getSupabase } = require('./db');
+const { supabase: sb } = require('./db');
 const logger = require('./logger');
 
 const HIPCOM_URL    = process.env.HIPCOM_URL    || 'http://emporiovilla.dyndns.info:2222/api/hipcom';
@@ -28,13 +28,13 @@ const hipcom = axios.create({
 
 // ─── Busca última data de sync salva no Supabase ───
 async function getUltimaSync() {
-  const sb = getSupabase();
+  // sb já importado no topo
   const { data } = await sb.from('bot_config').select('value').eq('key', SYNC_KEY).single();
   return data?.value || null;
 }
 
 async function salvarUltimaSync(ts) {
-  const sb = getSupabase();
+  // sb já importado no topo
   await sb.from('bot_config').upsert({ key: SYNC_KEY, value: ts }, { onConflict: 'key' });
 }
 
@@ -54,7 +54,7 @@ function normalizar(tel) {
 // ─── Faz upsert em lote no Supabase ───
 async function upsertClientes(clientes) {
   if (!clientes.length) return;
-  const sb = getSupabase();
+  // sb já importado no topo
   const rows = clientes.map(c => ({
     codigo:               c.codigo,
     loja:                 c.loja,
@@ -113,7 +113,7 @@ async function sincronizarClientes() {
 
 // ─── Busca cliente no Supabase (usada pelo bot) ───
 async function buscarClienteLocal(identificador) {
-  const sb = getSupabase();
+  // sb já importado no topo
   const apenasNums = identificador.replace(/\D/g, '');
 
   // Tenta CPF/CNPJ
