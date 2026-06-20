@@ -112,6 +112,17 @@ async function executarFerramenta(nomeFerramenta, inputs, session) {
     // Salva dados do cliente na sessão para uso no pedido
     session.customerName = cliente.nome;
     if (cliente.telefone) session.customerPhone = cliente.telefone;
+
+    // Monta endereço completo a partir dos campos separados do Hipcom
+    const enderecoCompleto = [
+      cliente.endereco,
+      cliente.complemento,
+      cliente.bairro,
+      cliente.cidade && cliente.uf ? `${cliente.cidade}/${cliente.uf}` : (cliente.cidade || cliente.uf),
+      cliente.cep ? `CEP ${cliente.cep}` : null,
+    ].filter(Boolean).join(', ');
+    if (enderecoCompleto) session.customerAddress = enderecoCompleto;
+
     const vezes = cliente.total_pedidos || 0;
     const perfil = vezes >= 10 ? 'fiel e muito frequente' : vezes >= 3 ? 'recorrente' : vezes > 0 ? 'já comprou antes' : 'novo';
 
@@ -119,8 +130,8 @@ async function executarFerramenta(nomeFerramenta, inputs, session) {
 Nome: ${cliente.nome}
 CPF: ${cliente.cpf}
 Telefone: ${cliente.telefone}
-Endereço cadastrado: ${cliente.endereco}
-Pagamento preferido: ${cliente.forma_pagamento_preferida}
+Endereço cadastrado: ${enderecoCompleto || '(não informado)'}
+Pagamento preferido: ${cliente.forma_pagamento_preferida || 'não informado'}
 Total de pedidos: ${vezes} | Perfil: ${perfil}`;
 
     // Último pedido
@@ -339,6 +350,9 @@ Para itens não listados acima (carnes, queijos, frios, embutidos): SEMPRE pergu
 
 REGRA CRÍTICA — ITENS DO PEDIDO:
 JAMAIS adicione ao pedido itens que o cliente NÃO solicitou explicitamente, mesmo que sejam favoritos, itens em promoção ou sugestões. Você pode SUGERIR ("Quer aproveitar e incluir X?"), mas NUNCA adicionar sem o cliente confirmar. O resumo final deve conter SOMENTE o que o cliente pediu.
+
+REGRA DE QUANTIDADE:
+Quando você perguntou "Quantas unidades/garrafas/kg quer?" e o cliente responde com um número ou quantidade (ex: "2", "3 unidades", "meio kg"), NÃO faça nova busca de produtos. Aplique a quantidade ao produto que estava sendo discutido imediatamente antes.
 
 REGRAS QUE NUNCA QUEBRA:
 - Jamais confirma disponibilidade sem verificar o estoque
