@@ -297,11 +297,37 @@ app.post('/admin/sync-clientes', async (req, res) => {
   if (req.query.key !== process.env.DASHBOARD_KEY) return res.status(401).json({ error: 'Não autorizado' });
   try {
     const { sincronizarClientes } = require('./hipcomSync');
-    res.json({ ok: true, mensagem: 'Sync iniciado em background' });
     await sincronizarClientes();
+    res.json({ ok: true, mensagem: 'Sync concluído' });
   } catch (err) {
-    logger.error('Erro no sync manual', { error: err.message });
+    logger.error('Erro no sync manual', { error: err.message, stack: err.stack });
+    res.status(500).json({ ok: false, erro: err.message });
   }
+});
+
+// ─── Diagnóstico Hipcom (testa conexão e vars) ───
+app.get('/admin/hipcom-diag', async (req, res) => {
+  if (req.query.key !== process.env.DASHBOARD_KEY) return res.status(401).json({ error: 'Não autorizado' });
+  const axios = require('axios');
+  const diag = {
+    HIPCOM_URL:   process.env.HIPCOM_URL   || '(não definido)',
+    HIPCOM_USER:  process.env.HIPCOM_USER  || '(não definido)',
+    HIPCOM_CNPJ:  process.env.HIPCOM_CNPJ  || '(não definido)',
+    HIPCOM_SENHA: process.env.HIPCOM_SENHA ? '(definido)' : '(não definido)',
+    HIPCOM_CLIENT_STORE: process.env.HIPCOM_CLIENT_STORE || '(não definido)',
+  };
+  try {
+    const r = await axios.get(`${process.env.HIPCOM_URL}/clientes`, {
+      params: { loja: process.env.HIPCOM_CLIENT_STORE || 1, limite: 1 },
+      auth: { username: process.env.HIPCOM_USER, password: process.env.HIPCOM_PASS },
+      headers: { cnpj: process.env.HIPCOM_CNPJ, senha: process.env.HIPCOM_SENHA },
+      timeout: 10000,
+    });
+    diag.teste_hipcom = `OK — ${r.data?.clientes?.length ?? 0} cliente(s) retornado(s)`;
+  } catch (err) {
+    diag.teste_hipcom = `ERRO: ${err.response?.data ? JSON.stringify(err.response.data) : err.message}`;
+  }
+  res.json(diag);
 });
 
 // ─── Rotas das interfaces web ───
