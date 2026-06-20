@@ -390,6 +390,22 @@ FORMATO DO RESUMO DO PEDIDO:
 Posso confirmar? 😊`;
 }
 
+// ─── System prompt com dados da sessão injetados ───
+function getSystemPromptComSessao(session) {
+  let prompt = getSystemPrompt();
+  if (session.customerName) {
+    prompt += `\n\nCLIENTE IDENTIFICADO: ${session.customerName}`;
+  }
+  if (session.customerAddress) {
+    prompt += `\nENDEREÇO CADASTRADO DO CLIENTE: ${session.customerAddress}`;
+    prompt += `\n→ USE este endereço automaticamente. Pergunte apenas "Entrego no ${session.customerAddress} — tá certo ou mudou?" antes de fechar o pedido. NUNCA peça o endereço completo novamente.`;
+  }
+  if (session.customerPhone) {
+    prompt += `\nTELEFONE DO CLIENTE: ${session.customerPhone}`;
+  }
+  return prompt;
+}
+
 // ─── Função principal: processa mensagem com loop de ferramentas ───
 async function processarComIA(session, novaMensagem) {
   // Adiciona mensagem do cliente ao histórico
@@ -402,7 +418,7 @@ async function processarComIA(session, novaMensagem) {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-5',
       max_tokens: 1024,
-      system: getSystemPrompt(),
+      system: getSystemPromptComSessao(session),
       tools,
       messages,
     });
