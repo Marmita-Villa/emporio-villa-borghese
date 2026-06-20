@@ -317,6 +317,17 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     HIPCOM_CLIENT_STORE: process.env.HIPCOM_CLIENT_STORE || '(não definido)',
   };
   try {
+    const { createClient } = require('@supabase/supabase-js');
+    const sb2 = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+    const { count } = await sb2.from('hipcom_clientes').select('*', { count: 'exact', head: true });
+    diag.supabase_clientes = `${count} registros`;
+
+    // Testa busca por CPF específico
+    const { data: cli } = await sb2.from('hipcom_clientes').select('nome,cpfcnpj,endereco,bairro').eq('cpfcnpj', '31317617843').single();
+    diag.busca_cpf_teste = cli ? `Encontrado: ${cli.nome} | ${cli.endereco}, ${cli.bairro}` : 'Não encontrado';
+  } catch(e) { diag.supabase_erro = e.message; }
+
+  try {
     const r = await axios.get(`${process.env.HIPCOM_URL}/clientes`, {
       params: { loja: process.env.HIPCOM_CLIENT_STORE || 1, limite: 1 },
       auth: { username: process.env.HIPCOM_USER, password: process.env.HIPCOM_PASS },
