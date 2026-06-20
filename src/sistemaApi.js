@@ -101,45 +101,15 @@ async function verificarEstoque(produtoId) {
   }
 }
 
-// ─── B.1 — Busca cliente por CPF, telefone ou nome ───
-// GET /clientes/buscar
-// Params: cpf (sem pontuação), telefone (com DDD), nome, incluir_historico
-// Resposta: { id, nome, cpf, telefone, endereco, forma_pagamento_preferida, ... }
+// ─── B.1 — Busca cliente no Supabase (sincronizado do Hipcom via hipcomSync.js) ───
 async function buscarCliente(identificador) {
-  const apenasNumeros = identificador.replace(/\D/g, '');
-
-  // Monta lista de tentativas — telefone tem prioridade sobre CPF quando ambíguo (11 dígitos)
-  const tentativas = [];
-  if (apenasNumeros.length >= 10 && apenasNumeros.length <= 11) {
-    tentativas.push({ telefone: apenasNumeros });           // tenta como telefone primeiro
+  try {
+    const { buscarClienteLocal } = require('./hipcomSync');
+    return await buscarClienteLocal(identificador);
+  } catch (err) {
+    logger.error('Erro ao buscar cliente', { identificador, error: err.message });
+    return null;
   }
-  if (apenasNumeros.length === 11) {
-    tentativas.push({ cpf: apenasNumeros });                // fallback: pode ser CPF
-  } else if (apenasNumeros.length >= 8) {
-    tentativas.push({ telefone: apenasNumeros });
-  }
-  if (!tentativas.length) {
-    tentativas.push({ nome: removerAcentos(identificador) });
-  }
-
-  for (const params of tentativas) {
-    try {
-      const res = await comRetry(() => api.get('/clientes/buscar', { params }));
-      if (res.data) return res.data;
-    } catch (err) {
-      const status = err.response?.status;
-      if (status === 404) continue;
-      logger.error('Erro ao buscar cliente', {
-        identificador,
-        status,
-        body: err.response?.data,
-        error: err.message,
-      });
-      if (status === 400) continue; // pode ser formato inválido — tenta próximo
-      return null;
-    }
-  }
-  return null;
 }
 
 // ─── C.1 — Cria pedido na retaguarda ───

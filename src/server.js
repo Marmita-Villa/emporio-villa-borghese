@@ -7,6 +7,7 @@ const { getOrCreateSession, clearSession, verificarSessoesExpiradas } = require(
 const { saveSession, salvarConversa } = require('./db');
 const agentesRouter = require('./agentes');
 const webhookEventos = require('./webhookEventos');
+const { iniciarSyncPeriodico } = require('./hipcomSync');
 const { processarMensagem } = require('./atendimento');
 const { getMsg } = require('./config');
 
@@ -313,4 +314,7 @@ setInterval(async () => {
 }, 2 * 60 * 1000); // a cada 2 minutos
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => logger.info(`Bot rodando`, { porta: PORT, env: process.env.MOCK_MODE === 'true' ? 'mock' : 'produção' }));
+app.listen(PORT, () => {
+  logger.info(`Bot rodando`, { porta: PORT, env: process.env.MOCK_MODE === 'true' ? 'mock' : 'produção' });
+  iniciarSyncPeriodico();
+});
