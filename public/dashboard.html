@@ -241,7 +241,7 @@
   async function fazerLogin() {
     const senha = document.getElementById('senha-input').value.trim();
     if (!senha) return;
-    const res = await fetch(`/api/dashboard?key=${encodeURIComponent(senha)}&periodo=hoje`);
+    const res = await fetch('/api/dashboard?periodo=hoje', { headers: { 'x-dashboard-key': senha } });
     if (res.status === 401) { document.getElementById('login-erro').textContent = 'Senha incorreta.'; return; }
     apiKey = senha;
     document.getElementById('login-screen').style.display = 'none';
@@ -263,13 +263,13 @@
   async function carregarDados() {
     const from = document.getElementById('data-from').value;
     const to   = document.getElementById('data-to').value;
-    let url = `/api/dashboard?key=${encodeURIComponent(apiKey)}`;
-    if (from && to) url += `&from=${from}&to=${to}`;
-    else url += `&periodo=${periodoAtual}`;
+    let url = `/api/dashboard?`;
+    if (from && to) url += `from=${from}&to=${to}`;
+    else url += `periodo=${periodoAtual}`;
 
     document.getElementById('main-content').innerHTML = '<div class="loading">⏳ Carregando relatórios...</div>';
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: { 'x-dashboard-key': apiKey } });
       dadosAtuais = await res.json();
       renderDashboard(dadosAtuais);
       document.getElementById('ultima-atualizacao').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');

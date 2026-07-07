@@ -8,9 +8,11 @@
 
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
+const { Redis } = require('@upstash/redis');
 const logger = require('./logger');
 
 const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+const redis = new Redis({ url: process.env.UPSTASH_REDIS_URL, token: process.env.UPSTASH_REDIS_TOKEN });
 
 const HIPCOM_URL    = process.env.HIPCOM_URL    || 'http://emporiovilla.dyndns.info:2222/api/hipcom';
 const HIPCOM_USER   = process.env.HIPCOM_USER   || 'hipcomfull';
@@ -28,16 +30,23 @@ const hipcom = axios.create({
   timeout: 30000,
 });
 
-// ─── Busca última data de sync salva no Supabase ───
+// ─── Busca última data de sync salva no Redis ───
+// (Redis evita o conflito de schema com bot_config, que usa colunas chave/valor no config.js)
 async function getUltimaSync() {
-  // sb já importado no topo
-  const { data } = await sb.from('bot_config').select('value').eq('key', SYNC_KEY).single();
-  return data?.value || null;
+  try {
+    return (await redis.get(SYNC_KEY)) || null;
+  } catch (err) {
+    logger.warn('hipcomSync: falha ao ler última sync do Redis', { error: err.message });
+    return null;
+  }
 }
 
 async function salvarUltimaSync(ts) {
-  // sb já importado no topo
-  await sb.from('bot_config').upsert({ key: SYNC_KEY, value: ts }, { onConflict: 'key' });
+  try {
+    await redis.set(SYNC_KEY, ts);
+  } catch (err) {
+    logger.warn('hipcomSync: falha ao salvar última sync no Redis', { error: err.message });
+  }
 }
 
 // ─── Busca página de clientes no Hipcom ───
