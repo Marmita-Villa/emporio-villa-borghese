@@ -1,6 +1,6 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const apiModule = process.env.MOCK_MODE === 'true' ? require('./mockApi') : require('./sistemaApiAdapter');
-const { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente } = apiModule;
+const { getProdutos, getOfertas, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente } = apiModule;
 const { saveSession, salvarConversa, salvarPedido } = require('./db');
 const logger = require('./logger');
 
@@ -52,6 +52,15 @@ const tools = [
         produto_nome: { type: 'string', description: 'Nome do produto para exibir ao cliente' },
       },
       required: ['produto_id', 'produto_nome'],
+    },
+  },
+  {
+    name: 'buscar_ofertas',
+    description: 'Retorna as ofertas/promoções do dia (produtos com preço promocional). Use quando o cliente perguntar sobre ofertas/promoções OU logo após cumprimentar o cliente, para destacar as promoções do dia.',
+    input_schema: {
+      type: 'object',
+      properties: {},
+      required: [],
     },
   },
   {
@@ -201,6 +210,25 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
     return `"${inputs.produto_nome}" está SEM ESTOQUE no momento.`;
   }
 
+  if (nomeFerramenta === 'buscar_ofertas') {
+    const ofertas = await getOfertas();
+    if (!ofertas.length) return 'Não há ofertas cadastradas no momento. Não invente promoções.';
+
+    // Registra as ofertas na sessão (para detectar conversões e permitir o pedido pelo nome)
+    const novas = ofertas.map(o => ({ nome: o.nome, preco_oferta: o.preco, preco_normal: o.preco_normal }));
+    session.currentOffers = [...(session.currentOffers || []), ...novas];
+    if (!session.productMap) session.productMap = {};
+    for (const o of ofertas.slice(0, 15)) {
+      session.productMap[o.nome.toLowerCase()] = { id: o.id, nome: o.nome, preco: o.preco };
+    }
+
+    const lista = ofertas.slice(0, 15).map(o => {
+      const de = o.preco_normal ? `de R$ ${Number(o.preco_normal).toFixed(2)} ` : '';
+      return `• ${o.nome} — ${de}por R$ ${Number(o.preco).toFixed(2)} (ID: ${o.id})`;
+    }).join('\n');
+    return `Ofertas do dia (${ofertas.length} no total):\n${lista}`;
+  }
+
   if (nomeFerramenta === 'verificar_tempo_entrega') {
     const demanda = await consultarDemandaCached();
     const msgs = {
@@ -300,6 +328,12 @@ AO RECEBER A IDENTIFICAÇÃO DO CLIENTE:
    - Se o cadastro tiver forma de pagamento preferida: sugira ela ("Vai ser no Pix como de costume?")
    - Só peça endereço completo se for novo cliente ou se o cliente quiser mudar
    - Ao finalizar: se o endereço do cadastro já tiver CEP (8 dígitos), use-o direto. Só peça o CEP se o endereço confirmado realmente não tiver CEP nenhum.
+
+OFERTAS DO DIA:
+- Logo após cumprimentar o cliente (novo ou recorrente), use a ferramenta buscar_ofertas e destaque 3 a 5 ofertas do dia de forma animada ("Aproveita que hoje tá com essas ofertas! 🔥"). Não despeje a lista inteira — escolha as mais atrativas e diga que pode mostrar mais se ele quiser.
+- Sempre que o cliente perguntar sobre promoções/ofertas/descontos, use buscar_ofertas.
+- Use SOMENTE as ofertas retornadas pela ferramenta. NUNCA invente promoções, preços ou descontos.
+- Mostrar oferta é convite, não inclusão: só adiciona ao pedido o que o cliente confirmar.
 
 NOSSAS UNIDADES E HORÁRIOS:
 • Rua Mato Grosso, 404, Santos/SP — Seg. a Sáb. das 8h às 21h | Dom. das 8h às 14h

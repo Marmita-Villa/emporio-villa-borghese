@@ -203,6 +203,19 @@ async function getProdutos(categoria = null) {
   return produtos;
 }
 
+async function getOfertas() {
+  return produtos
+    .filter(p => p.oferta && p.estoque > 0)
+    .map(p => ({
+      id:           p.id,
+      nome:         p.nome,
+      preco:        p.preco_oferta,
+      preco_normal: p.preco,
+      ean:          p.ean,
+      descricao_oferta: p.descricao_oferta,
+    }));
+}
+
 async function verificarEstoque(produtoId) {
   const produto = produtos.find(p => p.id === produtoId);
   if (!produto) return { disponivel: false, quantidade: 0 };
@@ -259,4 +272,4 @@ async function buscarCliente(identificador) {
   };
 }
 
-module.exports = { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente };
+module.exports = { getProdutos, getOfertas, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente };

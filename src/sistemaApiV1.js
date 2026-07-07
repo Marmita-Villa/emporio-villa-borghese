@@ -159,4 +159,7 @@ async function consultarDemanda() {
 // getProdutos mantido por compatibilidade
 async function getProdutos() { return []; }
 
-module.exports = { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente };
+// TODO: ajustar quando a nova API tiver endpoint de ofertas/promoções
+async function getOfertas() { return []; }
+
+module.exports = { getProdutos, getOfertas, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente };
