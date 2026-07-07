@@ -456,6 +456,14 @@ async function processarComIA(session, novaMensagem) {
 
     // Salva resposta da IA no histórico da sessão
     session.messages.push({ role: 'assistant', content: textoResposta });
+
+    // Mantém só as últimas 20 mensagens (10 trocas) para conter tokens/custo.
+    // O array é sempre pares user→assistant, então o corte par preserva o início em 'user'.
+    const MAX_MENSAGENS = 20;
+    if (session.messages.length > MAX_MENSAGENS) {
+      session.messages = session.messages.slice(session.messages.length - MAX_MENSAGENS);
+    }
+
     logger.debug(`Resposta da IA`, { phone: session.phone, chars: textoResposta.length });
 
     // Persiste sessão no Redis e histórico no Supabase (fire-and-forget)

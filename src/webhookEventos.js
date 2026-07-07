@@ -24,11 +24,14 @@ const WEBHOOK_SECRET = process.env.WEBHOOK_EVENTOS_SECRET || '';
 function validarAssinatura(req) {
   if (!WEBHOOK_SECRET) return true; // sem secret configurado, aceita tudo (remover em produção)
   const assinatura = req.headers['x-webhook-signature'] || req.headers['x-webhook-secret'] || '';
-  const esperado = crypto
-    .createHmac('sha256', WEBHOOK_SECRET)
-    .update(JSON.stringify(req.body))
-    .digest('hex');
-  return crypto.timingSafeEqual(Buffer.from(assinatura), Buffer.from(esperado));
+  // HMAC sobre os bytes originais (req.rawBody capturado no server.js). JSON.stringify(req.body)
+  // não bate byte-a-byte com o payload assinado e faria assinaturas válidas falharem.
+  const corpo = req.rawBody || Buffer.from(JSON.stringify(req.body));
+  const esperado = crypto.createHmac('sha256', WEBHOOK_SECRET).update(corpo).digest('hex');
+  const a = Buffer.from(assinatura);
+  const b = Buffer.from(esperado);
+  if (a.length !== b.length) return false; // timingSafeEqual estoura se os tamanhos diferem
+  return crypto.timingSafeEqual(a, b);
 }
 
 // ─── Mensagens por evento ───
@@ -78,7 +81,8 @@ function mensagemPagamentoFalhou(evento) {
 
 // ─── Endpoint principal ───
 
-router.post('/eventos', express.json(), (req, res) => {
+// express.json() global (com captura de rawBody) já roda no server.js antes deste handler
+router.post('/eventos', (req, res) => {
   if (!validarAssinatura(req)) {
     logger.warn('Webhook evento: assinatura inválida');
     return res.status(401).json({ error: 'Assinatura inválida' });
