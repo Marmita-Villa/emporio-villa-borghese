@@ -379,7 +379,18 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     diag.ofertas_hipcom = ofertas.length
       ? `${ofertas.length} oferta(s) — ex: ${ofertas.slice(0, 3).map(o => `${o.nome} (R$ ${o.preco})`).join('; ')}`
       : '0 ofertas retornadas';
+    diag.ofertas_setores = [...new Set(ofertas.map(o => o.setor).filter(Boolean))];
   } catch (e) { diag.ofertas_erro = e.message; }
+
+  // Dump de um produto cru do Hipcom — revela o nome real do campo de setor/seção
+  try {
+    const r = await axios.get(`${process.env.HIPCOM_URL}/produtos`, {
+      params: { loja: process.env.HIPCOM_PRICE_STORE || 6, limite: 1 },
+      auth: { username: process.env.HIPCOM_USER, password: process.env.HIPCOM_PASS },
+      timeout: 10000,
+    });
+    diag.produto_hipcom_raw = r.data?.produtos?.[0] || r.data;
+  } catch (e) { diag.produto_raw_erro = e.message; }
 
   try {
     const r = await axios.get(`${process.env.HIPCOM_URL}/clientes`, {

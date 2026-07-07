@@ -211,6 +211,7 @@ async function getOfertas() {
       nome:         p.nome,
       preco:        p.preco_oferta,
       preco_normal: p.preco,
+      setor:        p.categoria,
       ean:          p.ean,
       descricao_oferta: p.descricao_oferta,
     }));
