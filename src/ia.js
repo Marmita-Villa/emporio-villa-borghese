@@ -56,10 +56,12 @@ const tools = [
   },
   {
     name: 'buscar_ofertas',
-    description: 'Retorna as ofertas/promoções do dia (produtos com preço promocional). Use quando o cliente perguntar sobre ofertas/promoções OU logo após cumprimentar o cliente, para destacar as promoções do dia.',
+    description: 'Ofertas do dia por setor. Chame SEM setor para obter a lista de setores que têm ofertas (ex: FLV, Mercearia, Limpeza). Chame COM setor para listar as ofertas daquele setor. Use quando o cliente pedir para ver ofertas/promoções.',
     input_schema: {
       type: 'object',
-      properties: {},
+      properties: {
+        setor: { type: 'string', description: 'Setor escolhido pelo cliente (ex: "mercearia", "flv", "limpeza"). Deixe vazio para listar os setores disponíveis.' },
+      },
       required: [],
     },
   },
@@ -214,19 +216,51 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
     const ofertas = await getOfertas();
     if (!ofertas.length) return 'Não há ofertas cadastradas no momento. Não invente promoções.';
 
-    // Registra as ofertas na sessão (para detectar conversões e permitir o pedido pelo nome)
-    const novas = ofertas.map(o => ({ nome: o.nome, preco_oferta: o.preco, preco_normal: o.preco_normal }));
+    const filtro = (inputs.setor || '').trim().toLowerCase();
+    const temSetores = ofertas.some(o => o.setor);
+
+    // Sem setor escolhido: se há setores, apresenta os setores para o cliente escolher
+    if (!filtro && temSetores) {
+      const contagem = {};
+      for (const o of ofertas) {
+        const s = o.setor || 'Outros';
+        contagem[s] = (contagem[s] || 0) + 1;
+      }
+      const listaSetores = Object.entries(contagem)
+        .sort((a, b) => b[1] - a[1])
+        .map(([s, n]) => `• ${s} (${n} ${n === 1 ? 'oferta' : 'ofertas'})`)
+        .join('\n');
+      return `Temos ofertas nestes setores:\n${listaSetores}\n\nPeça as ofertas de um setor (ex: "ofertas mercearia") e eu listo pra você.`;
+    }
+
+    // Com setor (ou sem setores no dado): filtra
+    let lista = ofertas;
+    if (filtro) {
+      lista = ofertas.filter(o => {
+        const s = (o.setor || '').toLowerCase();
+        return s.includes(filtro) || filtro.includes(s);
+      });
+      if (!lista.length) {
+        const disp = [...new Set(ofertas.map(o => o.setor).filter(Boolean))].join(', ');
+        return `Não encontrei ofertas no setor "${inputs.setor}". Setores com ofertas: ${disp || 'nenhum específico'}.`;
+      }
+    }
+
+    // Registra as ofertas exibidas na sessão (converte pelo nome e marca itens_oferta nas métricas)
+    const novas = lista.map(o => ({ nome: o.nome, preco_oferta: o.preco, preco_normal: o.preco_normal }));
     session.currentOffers = [...(session.currentOffers || []), ...novas];
     if (!session.productMap) session.productMap = {};
-    for (const o of ofertas.slice(0, 15)) {
+    for (const o of lista.slice(0, 30)) {
       session.productMap[o.nome.toLowerCase()] = { id: o.id, nome: o.nome, preco: o.preco };
     }
 
-    const lista = ofertas.slice(0, 15).map(o => {
+    const texto = lista.slice(0, 20).map(o => {
       const de = o.preco_normal ? `de R$ ${Number(o.preco_normal).toFixed(2)} ` : '';
       return `• ${o.nome} — ${de}por R$ ${Number(o.preco).toFixed(2)} (ID: ${o.id})`;
     }).join('\n');
-    return `Ofertas do dia (${ofertas.length} no total):\n${lista}`;
+    const cabecalho = filtro ? `Ofertas de ${inputs.setor}` : 'Ofertas do dia';
+    const rodape = lista.length > 20 ? `\n(mostrando 20 de ${lista.length})` : '';
+    return `${cabecalho} (${lista.length}):\n${texto}${rodape}`;
   }
 
   if (nomeFerramenta === 'verificar_tempo_entrega') {
@@ -329,11 +363,12 @@ AO RECEBER A IDENTIFICAÇÃO DO CLIENTE:
    - Só peça endereço completo se for novo cliente ou se o cliente quiser mudar
    - Ao finalizar: se o endereço do cadastro já tiver CEP (8 dígitos), use-o direto. Só peça o CEP se o endereço confirmado realmente não tiver CEP nenhum.
 
-OFERTAS DO DIA:
+OFERTAS DO DIA (por setor):
 - Ao cumprimentar o cliente, NÃO liste as ofertas de cara. Apenas avise, de forma animada, que hoje tem ótimas ofertas e convide a ver: "Ah, e hoje temos ótimas ofertas! 🔥 Se quiser dar uma olhada, é só me mandar *ver ofertas* 😊".
-- Só use a ferramenta buscar_ofertas QUANDO o cliente demonstrar interesse (ex: "ver ofertas", "quero ver", "tem promoção?", "o que tá em oferta?"). Aí sim liste as ofertas retornadas de forma organizada e animada.
+- Quando o cliente pedir para ver ofertas (ex: "ver ofertas", "tem promoção?"), chame buscar_ofertas SEM o parâmetro setor. Isso retorna os SETORES que têm oferta (ex: FLV, Mercearia, Limpeza). Apresente os setores de forma clara e peça para ele escolher: "Temos ofertas em [setores]. Qual você quer ver? Ex: *ofertas mercearia* 😊".
+- Quando o cliente escolher um setor (ex: "ofertas mercearia", "quero as de limpeza", "FLV"), chame buscar_ofertas COM o parâmetro setor e liste as ofertas daquele setor de forma organizada e animada.
 - Se não houver ofertas no momento, avise com naturalidade e siga ajudando com os produtos normalmente.
-- Use SOMENTE as ofertas retornadas pela ferramenta. NUNCA invente promoções, preços ou descontos.
+- Use SOMENTE os setores e ofertas retornados pela ferramenta. NUNCA invente promoções, preços, setores ou descontos.
 - Mostrar oferta é convite, não inclusão: só adiciona ao pedido o que o cliente confirmar.
 
 NOSSAS UNIDADES E HORÁRIOS:

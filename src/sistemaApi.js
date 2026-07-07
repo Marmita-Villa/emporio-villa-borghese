@@ -113,6 +113,13 @@ async function getProdutos() {
   }
 }
 
+// ─── Detecta o setor/seção do produto Hipcom (nome do campo varia por instalação) ───
+function detectarSetor(p) {
+  const cand = p.secao || p.nome_secao || p.descricao_secao || p.grupo || p.nome_grupo
+            || p.departamento || p.categoria || p.familia || p.setor;
+  return cand ? String(cand).trim() : null;
+}
+
 // ─── A.3 — Ofertas do dia: produtos com preço promocional (valor_promocao > 0) ───
 // Tenta o filtro somente_promocao=S (se o Hipcom honrar, retorna só promoções); de
 // qualquer forma filtra no cliente por valor_promocao. Cacheado no Redis (TTL 5 min).
@@ -134,6 +141,7 @@ async function getOfertas() {
         nome:         p.descricao,
         preco:        p.valor_promocao,
         preco_normal: p.valor_produto,
+        setor:        detectarSetor(p),
         ean:          p.codigo_barra ? String(p.codigo_barra) : null,
       }));
     await cacheSet(chave, ofertas);
