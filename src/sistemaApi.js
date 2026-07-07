@@ -28,15 +28,20 @@ const HIPCOM_LOJA_PRECO  = parseInt(process.env.HIPCOM_PRICE_STORE  || '6', 10);
 const HIPCOM_LOJAS_ESTOQUE = (process.env.HIPCOM_STOCK_STORES || '1,6').split(',').map(Number).filter(Boolean);
 const HIPCOM_BLOCKED     = (process.env.HIPCOM_BLOCKED_ITEMS || '').split(',').map(s => s.trim()).filter(Boolean);
 
-// ─── Cache simples em memória (TTL 5 min) ───
-const _cache = new Map();
-function cacheGet(key) {
-  const entry = _cache.get(key);
-  if (!entry) return null;
-  if (Date.now() - entry.ts > 5 * 60 * 1000) { _cache.delete(key); return null; }
-  return entry.val;
+// ─── Cache Redis compartilhado (TTL 5 min) ───
+const { Redis } = require('@upstash/redis');
+const _redis = new Redis({
+  url: process.env.UPSTASH_REDIS_URL,
+  token: process.env.UPSTASH_REDIS_TOKEN,
+});
+const CACHE_TTL = 5 * 60; // segundos
+
+async function cacheGet(key) {
+  try { return await _redis.get(key); } catch { return null; }
 }
-function cacheSet(key, val) { _cache.set(key, { val, ts: Date.now() }); }
+async function cacheSet(key, val) {
+  try { await _redis.set(key, val, { ex: CACHE_TTL }); } catch {}
+}
 
 // ─── Remove acentos para compatibilidade com a API (não suporta caracteres acentuados) ───
 function removerAcentos(texto) {
@@ -67,7 +72,7 @@ function pareceCodBarras(termo) {
 // ─── A.1 — Busca produtos por nome ou código de barras via Hipcom ───
 async function buscarProduto(termo) {
   const chave = `prod:${termo.trim().toLowerCase()}`;
-  const cached = cacheGet(chave);
+  const cached = await cacheGet(chave);
   if (cached) return cached;
   try {
     const termoLimpo = termo.trim();
@@ -85,7 +90,7 @@ async function buscarProduto(termo) {
         ean:   p.codigo_barra ? String(p.codigo_barra) : null,
       }));
 
-    cacheSet(chave, produtos);
+    await cacheSet(chave, produtos);
     return produtos;
   } catch (err) {
     logger.error('Erro ao buscar produto no Hipcom', { termo, error: err.message });
@@ -111,7 +116,7 @@ async function getProdutos() {
 // ─── A.2 — Verifica estoque via qtd_estoque_atual do endpoint de produtos ───
 async function verificarEstoque(produtoId) {
   const chave = `estoque:${produtoId}`;
-  const cached = cacheGet(chave);
+  const cached = await cacheGet(chave);
   if (cached) return cached;
   try {
     const res = await hipcom.get('/produtos', { params: { loja: HIPCOM_LOJA_PRECO, plu: produtoId } });
@@ -119,7 +124,7 @@ async function verificarEstoque(produtoId) {
     if (!produto) return { disponivel: true, quantidade: -1 };
     const quantidade = produto.qtd_estoque_atual || 0;
     const result = { disponivel: quantidade > 0, quantidade };
-    cacheSet(chave, result);
+    await cacheSet(chave, result);
     return result;
   } catch (err) {
     logger.warn('verificar_estoque Hipcom falhou, assumindo disponível', { produtoId, error: err.message });
