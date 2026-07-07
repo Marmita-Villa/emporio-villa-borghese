@@ -11,8 +11,9 @@ const logger = require('./logger');
 
 const router = express.Router();
 
+let _sb;
 function getSupabase() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  return _sb || (_sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY));
 }
 
 // ─── Auth ───
@@ -74,27 +75,6 @@ router.delete('/agentes/:id', verificarToken, requireAdmin, async (req, res) => 
   const sb = getSupabase();
   await sb.from('agents').update({ ativo: false }).eq('id', req.params.id);
   res.json({ ok: true });
-});
-
-// ─── Histórico de conversas ───
-
-router.get('/historico', verificarToken, async (req, res) => {
-  const sb = getSupabase();
-  const { de, ate, nome } = req.query;
-
-  let query = sb
-    .from('conversations')
-    .select('phone,customer_name,status,converted,updated_at,started_at')
-    .not('status', 'in', '("aguardando","em_atendimento")')
-    .order('updated_at', { ascending: false })
-    .limit(100);
-
-  if (de)   query = query.gte('updated_at', new Date(de).toISOString());
-  if (ate)  query = query.lte('updated_at', new Date(ate + 'T23:59:59').toISOString());
-  if (nome) query = query.ilike('customer_name', `%${nome}%`);
-
-  const { data } = await query;
-  res.json(data || []);
 });
 
 // ─── Fila de atendimento ───

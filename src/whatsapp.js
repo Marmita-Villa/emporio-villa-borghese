@@ -1,6 +1,6 @@
 const axios = require('axios');
 const { getOrCreateSession } = require('./session');
-const { saveSession, salvarConversa, salvarMensagemHumana } = require('./db');
+const { saveSession, salvarConversa, salvarMensagemHumana, tocarConversa } = require('./db');
 const { processarMensagem } = require('./atendimento');
 const logger = require('./logger');
 
@@ -50,6 +50,7 @@ async function handleIncomingMessage(phone, texto, messageId) {
   // Quando em atendimento humano: salva mensagem e não responde (agente responde pelo painel)
   if (session.step === 'humano') {
     await salvarMensagemHumana({ phone, direction: 'in', content: texto });
+    tocarConversa(phone).catch(() => {}); // sinaliza novidade no painel (fire-and-forget)
     logger.info('Mensagem recebida em modo humano', { phone });
     return;
   }

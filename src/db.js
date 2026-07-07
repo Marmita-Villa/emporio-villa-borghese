@@ -183,6 +183,15 @@ async function salvarMensagemHumana({ phone, direction, content }) {
   }
 }
 
+// Bump updated_at da conversa para sinalizar atividade do cliente (novidade no painel)
+async function tocarConversa(phone) {
+  try {
+    await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('phone', phone);
+  } catch (err) {
+    logger.error('Erro ao tocar conversa', { phone, error: err.message });
+  }
+}
+
 module.exports = {
   getOrCreateSession,
   saveSession,
@@ -190,5 +199,6 @@ module.exports = {
   salvarConversa,
   salvarPedido,
   salvarMensagemHumana,
+  tocarConversa,
   pegarInativos,
 };

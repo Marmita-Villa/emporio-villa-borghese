@@ -114,6 +114,15 @@
     .status-dot.em_atendimento { background: var(--laranja-light); }
     .status-dot.encerrado { background: var(--cinza-3); }
     .empty-list { text-align: center; padding: 48px 20px; color: var(--cinza-3); font-size: 13px; }
+    .conv-item.novidade { background: #fff8ee; }
+    .conv-item.novidade:hover { background: #fdf1de; }
+    .novidade-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e67e22; margin-left: 6px; vertical-align: middle; animation: pulseDot 1.4s infinite; }
+    @keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    .busca-fila-wrap { padding: 8px 12px; border-bottom: 1px solid var(--cinza-1); background: var(--branco); flex-shrink: 0; }
+    .busca-fila-wrap input { width: 100%; padding: 8px 12px; border: 1.5px solid var(--cinza-2); border-radius: 8px; font-size: 13px; outline: none; font-family: inherit; background: var(--creme); }
+    .busca-fila-wrap input:focus { border-color: var(--laranja-light); background: var(--branco); }
+    .btn-voltar { display: none; background: rgba(255,255,255,0.15); border: none; color: white; font-size: 22px; width: 34px; height: 34px; border-radius: 8px; cursor: pointer; flex-shrink: 0; align-items: center; justify-content: center; line-height: 1; }
+    .btn-voltar:hover { background: rgba(255,255,255,0.28); }
 
     /* ── Chat ── */
     .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--creme-dark); }
@@ -239,6 +248,7 @@
       .chat-area { display: none; }
       .conv-list.hidden { display: none; }
       .chat-area.show { display: flex; }
+      .btn-voltar { display: flex; }
       .form-row { grid-template-columns: 1fr; }
     }
 
@@ -315,6 +325,9 @@
     <div id="view-fila" class="content" style="width:100%">
       <div class="conv-list" id="conv-list">
         <div class="conv-list-header" id="list-header">Aguardando atendimento</div>
+        <div class="busca-fila-wrap">
+          <input id="busca-fila" type="text" placeholder="🔍 Buscar por nome ou telefone" oninput="filtrarFila(this.value)" autocomplete="off" />
+        </div>
         <div class="conv-items" id="conv-items"></div>
       </div>
       <div class="chat-area" id="chat-area">
@@ -325,6 +338,7 @@
         </div>
         <div id="chat-active" style="display:none; flex-direction:column; height:100%">
           <div class="chat-header">
+            <button class="btn-voltar" onclick="voltarLista()" title="Voltar para a lista">‹</button>
             <div class="chat-avatar" id="chat-avatar">?</div>
             <div class="info">
               <h3 id="chat-nome"></h3>
@@ -480,6 +494,10 @@
   let phoneAtivo = null;
   let pollingInterval = null;
   let chatPollingInterval = null;
+  let filaData = [];                    // últimas conversas carregadas
+  let filaAguardandoAnterior = null;    // nº de "aguardando" no poll anterior (alerta de nova)
+  let vistas = {};                      // phone -> updated_at já visto (indicador de novidade)
+  let filtroFila = '';                  // termo de busca da fila
 
   // ── Init ──
   window.addEventListener('load', () => {
@@ -521,9 +539,45 @@
     document.getElementById('app').style.display = 'flex';
     document.getElementById('agent-nome').textContent = agente.nome;
     if (agente.role === 'admin') document.getElementById('tab-agentes').style.display = 'block';
+
+    // Pede permissão para notificações do navegador (alerta de nova conversa)
+    if ('Notification' in window && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch (_) {}
+    }
+    // Delegação de clique na lista (evita onclick inline com nome não escapado)
+    document.getElementById('conv-items').addEventListener('click', (e) => {
+      const item = e.target.closest('.conv-item');
+      if (!item) return;
+      const c = filaData.find(x => x.phone === item.dataset.phone);
+      abrirConversa(item.dataset.phone, c?.customer_name || 'Cliente');
+    });
+
     mudarAba('fila');
     iniciarPolling();
     carregarRespostasRapidas(); // pré-carrega para uso no chat
+  }
+
+  // ── Alertas de nova conversa ──
+  function atualizarTituloAba(n) {
+    document.title = n > 0 ? `(${n}) Painel — Villa Borghese` : 'Villa Borghese — Painel de Atendimento';
+  }
+  function tocarBip() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine'; osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(); osc.stop(ctx.currentTime + 0.45);
+      setTimeout(() => { try { ctx.close(); } catch (_) {} }, 700);
+    } catch (_) {}
+  }
+  function alertarNovaConversa(total) {
+    tocarBip();
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try { new Notification('🔔 Nova conversa na fila', { body: `${total} cliente(s) aguardando atendimento.` }); } catch (_) {}
+    }
   }
 
   // ── API helper ──
@@ -539,6 +593,9 @@
   // ── Navegação ──
   function mudarAba(aba) {
     abaAtual = aba;
+    filtroFila = '';
+    const bf = document.getElementById('busca-fila');
+    if (bf) bf.value = '';
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === aba));
     document.getElementById('view-fila').style.display = (aba === 'fila' || aba === 'minhas') ? 'flex' : 'none';
     document.getElementById('view-historico').style.display = aba === 'historico' ? 'flex' : 'none';
@@ -565,7 +622,24 @@
   async function carregarFila() {
     const data = await api('/fila');
     if (!data || !Array.isArray(data)) return;
+    filaData = data;
 
+    // #3 — alerta quando entra uma nova conversa na fila
+    const aguardando = data.filter(c => c.status === 'aguardando');
+    if (filaAguardandoAnterior !== null && aguardando.length > filaAguardandoAnterior) {
+      alertarNovaConversa(aguardando.length);
+    }
+    filaAguardandoAnterior = aguardando.length;
+    atualizarTituloAba(aguardando.length);
+
+    renderFila();
+  }
+
+  // Filtra sem refazer a chamada à API
+  function filtrarFila(v) { filtroFila = (v || '').trim().toLowerCase(); renderFila(); }
+
+  function renderFila() {
+    const data = filaData;
     const aguardando = data.filter(c => c.status === 'aguardando');
     const emAtendimento = data.filter(c => c.status === 'em_atendimento');
     const minhas = emAtendimento.filter(c => c.assigned_name === agente.nome);
@@ -580,31 +654,51 @@
 
     // Admin vê todas as conversas em atendimento; agente vê só as suas
     const listaAtendimento = agente.role === 'admin' ? emAtendimento : minhas;
-    const lista = abaAtual === 'fila' ? aguardando : listaAtendimento;
+    let lista = abaAtual === 'fila' ? aguardando : listaAtendimento;
     document.getElementById('list-header').textContent =
       abaAtual === 'fila' ? 'Aguardando atendimento'
       : agente.role === 'admin' ? 'Todas as conversas ativas'
       : 'Minhas conversas ativas';
 
+    // #4 — baseline de novidade: primeira vez que vejo um telefone, não marca
+    for (const c of data) { if (!(c.phone in vistas)) vistas[c.phone] = c.updated_at; }
+
+    // #7 — filtro de busca (nome ou telefone)
+    if (filtroFila) {
+      lista = lista.filter(c =>
+        (c.customer_name || '').toLowerCase().includes(filtroFila) ||
+        (c.phone || '').includes(filtroFila));
+    }
+
     const container = document.getElementById('conv-items');
     if (!lista.length) {
-      container.innerHTML = `<div class="empty-list">${abaAtual === 'fila' ? '✅ Nenhuma conversa na fila' : '😊 Nenhuma conversa ativa'}</div>`;
+      const msg = filtroFila ? '🔍 Nada encontrado'
+        : (abaAtual === 'fila' ? '✅ Nenhuma conversa na fila' : '😊 Nenhuma conversa ativa');
+      container.innerHTML = `<div class="empty-list">${msg}</div>`;
       return;
     }
 
-    container.innerHTML = lista.map(c => `
-      <div class="conv-item ${phoneAtivo === c.phone ? 'active' : ''}" onclick="abrirConversa('${c.phone}', '${(c.customer_name || 'Cliente').replace(/'/g, "\\'")}')">
-        <div class="name"><span class="status-dot ${c.status}"></span>${c.customer_name || 'Cliente'}</div>
-        <div class="phone">${c.phone}</div>
-        <div class="preview">${c.assigned_name ? '👤 ' + c.assigned_name : '⏳ Aguardando'}</div>
+    container.innerHTML = lista.map(c => {
+      const novidade = c.phone !== phoneAtivo && vistas[c.phone] !== undefined && vistas[c.phone] !== c.updated_at;
+      return `
+      <div class="conv-item ${phoneAtivo === c.phone ? 'active' : ''} ${novidade ? 'novidade' : ''}" data-phone="${escRaw(c.phone)}">
+        <div class="name"><span class="status-dot ${c.status}"></span>${escRaw(c.customer_name || 'Cliente')}${novidade ? '<span class="novidade-dot" title="Nova mensagem"></span>' : ''}</div>
+        <div class="phone">${escRaw(c.phone)}</div>
+        <div class="preview">${c.assigned_name ? '👤 ' + escRaw(c.assigned_name) : '⏳ Aguardando'}</div>
         <div class="time">${tempoRelativo(c.updated_at)}</div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   // ── Conversa ──
   async function abrirConversa(phone, nome) {
     phoneAtivo = phone;
+    // #4 — marca como visto (limpa o indicador de novidade)
+    const c = filaData.find(x => x.phone === phone);
+    if (c) vistas[phone] = c.updated_at;
+    // #2 — no mobile, mostra o chat e esconde a lista
+    document.getElementById('conv-list').classList.add('hidden');
+    document.getElementById('chat-area').classList.add('show');
     document.getElementById('chat-empty').style.display = 'none';
     document.getElementById('chat-active').style.display = 'flex';
     document.getElementById('chat-nome').textContent = nome;
@@ -793,8 +887,16 @@
   function fecharChat() {
     phoneAtivo = null;
     clearInterval(chatPollingInterval);
+    document.getElementById('conv-list').classList.remove('hidden');
+    document.getElementById('chat-area').classList.remove('show');
     document.getElementById('chat-empty').style.display = 'flex';
     document.getElementById('chat-active').style.display = 'none';
+  }
+
+  // #2 — botão "voltar" no mobile: mostra a lista de novo (mantém a conversa aberta)
+  function voltarLista() {
+    document.getElementById('conv-list').classList.remove('hidden');
+    document.getElementById('chat-area').classList.remove('show');
   }
 
   // ── Histórico ──
