@@ -113,6 +113,37 @@ async function getProdutos() {
   }
 }
 
+// ─── A.3 — Ofertas do dia: produtos com preço promocional (valor_promocao > 0) ───
+// Tenta o filtro somente_promocao=S (se o Hipcom honrar, retorna só promoções); de
+// qualquer forma filtra no cliente por valor_promocao. Cacheado no Redis (TTL 5 min).
+async function getOfertas() {
+  const chave = 'ofertas:dia';
+  const cached = await cacheGet(chave);
+  if (cached) return cached;
+  try {
+    const res = await hipcom.get('/produtos', {
+      params: { loja: HIPCOM_LOJA_PRECO, somente_estoque_positivo: 'S', somente_promocao: 'S', limite: 500 },
+    });
+    const ofertas = (res.data?.produtos || [])
+      .filter(p => p.ativo === 'S'
+        && !HIPCOM_BLOCKED.includes(String(p.plu))
+        && p.valor_promocao > 0
+        && p.valor_promocao < p.valor_produto)
+      .map(p => ({
+        id:           String(p.plu),
+        nome:         p.descricao,
+        preco:        p.valor_promocao,
+        preco_normal: p.valor_produto,
+        ean:          p.codigo_barra ? String(p.codigo_barra) : null,
+      }));
+    await cacheSet(chave, ofertas);
+    return ofertas;
+  } catch (err) {
+    logger.error('Erro ao buscar ofertas no Hipcom', { error: err.message });
+    return [];
+  }
+}
+
 // ─── A.2 — Verifica estoque via qtd_estoque_atual do endpoint de produtos ───
 async function verificarEstoque(produtoId) {
   const chave = `estoque:${produtoId}`;
@@ -242,4 +273,4 @@ async function consultarDemanda() {
   }
 }
 
-module.exports = { getProdutos, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente };
+module.exports = { getProdutos, getOfertas, buscarProduto, verificarEstoque, criarPedido, consultarDemanda, buscarCliente };

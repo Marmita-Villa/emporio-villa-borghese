@@ -372,6 +372,15 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     }
   } catch(e) { diag.supabase_erro = e.message; }
 
+  // Quantas ofertas o Hipcom retorna (valida a vitrine de ofertas do dia)
+  try {
+    const { getOfertas } = require('./sistemaApi');
+    const ofertas = await getOfertas();
+    diag.ofertas_hipcom = ofertas.length
+      ? `${ofertas.length} oferta(s) — ex: ${ofertas.slice(0, 3).map(o => `${o.nome} (R$ ${o.preco})`).join('; ')}`
+      : '0 ofertas retornadas';
+  } catch (e) { diag.ofertas_erro = e.message; }
+
   try {
     const r = await axios.get(`${process.env.HIPCOM_URL}/clientes`, {
       params: { loja: process.env.HIPCOM_CLIENT_STORE || 1, limite: 1 },
