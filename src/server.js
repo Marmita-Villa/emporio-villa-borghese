@@ -11,8 +11,25 @@ const { iniciarSyncPeriodico } = require('./hipcomSync');
 const { processarMensagem } = require('./atendimento');
 const { getMsg } = require('./config');
 
+const crypto = require('crypto');
+
 const app = express();
-app.use(express.json());
+// Captura o corpo bruto para validação de assinatura da Meta (HMAC sobre os bytes originais)
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
+
+// ─── Validação da assinatura da Meta (X-Hub-Signature-256) ───
+// Ativa somente se META_APP_SECRET estiver definido — sem o secret, mantém comportamento atual.
+const META_APP_SECRET = process.env.META_APP_SECRET || '';
+function assinaturaMetaValida(req) {
+  if (!META_APP_SECRET) return true; // não configurado: não bloqueia
+  const header = req.headers['x-hub-signature-256'] || '';
+  if (!header.startsWith('sha256=') || !req.rawBody) return false;
+  const esperado = 'sha256=' + crypto.createHmac('sha256', META_APP_SECRET).update(req.rawBody).digest('hex');
+  const a = Buffer.from(header);
+  const b = Buffer.from(esperado);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
 
 // ─── Deduplicação de mensagens (evita reprocessar webhooks duplicados da Meta) ───
 const mensagensProcessadas = new Set();
@@ -61,6 +78,10 @@ app.get('/webhook', (req, res) => {
 // ─── Recebe mensagens do WhatsApp ───
 app.post('/webhook', async (req, res) => {
   try {
+    if (!assinaturaMetaValida(req)) {
+      logger.warn('Webhook: assinatura da Meta inválida');
+      return res.sendStatus(401);
+    }
     const body = req.body;
     if (body.object !== 'whatsapp_business_account') return res.sendStatus(404);
 
@@ -106,8 +127,13 @@ app.post('/webhook', async (req, res) => {
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
 // ─── API do dashboard de relatórios ───
+function dashboardKeyValida(req) {
+  const key = req.headers['x-dashboard-key'] || req.query.key;
+  return key === process.env.DASHBOARD_KEY;
+}
+
 app.get('/api/dashboard', async (req, res) => {
-  if (req.query.key !== process.env.DASHBOARD_KEY) return res.status(401).json({ error: 'Não autorizado' });
+  if (!dashboardKeyValida(req)) return res.status(401).json({ error: 'Não autorizado' });
 
   const { periodo = '30d', from: fromParam, to: toParam } = req.query;
   const agora = new Date();
@@ -129,7 +155,8 @@ app.get('/api/dashboard', async (req, res) => {
 
   const [ordersRes, convsRes, humanConvsRes, msgsPorAgenteRes] = await Promise.all([
     sb.from('orders').select('*').gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
-    sb.from('conversations').select('phone,customer_name,step,converted,transferred_to_human,created_at,started_at,updated_at').gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
+    // Filtra por started_at (renovado a cada conversa nova) — created_at fica congelado no 1º contato do cliente
+    sb.from('conversations').select('phone,customer_name,step,converted,transferred_to_human,created_at,started_at,updated_at').gte('started_at', fromDate.toISOString()).lte('started_at', toDate.toISOString()),
     sb.from('conversations').select('assigned_name,human_started_at,human_ended_at').not('assigned_name', 'is', null).not('human_started_at', 'is', null).gte('human_started_at', fromDate.toISOString()).lte('human_started_at', toDate.toISOString()),
     sb.from('human_messages').select('agent_name').eq('direction', 'out').not('agent_name', 'is', null).gte('created_at', fromDate.toISOString()).lte('created_at', toDate.toISOString()),
   ]);
@@ -219,7 +246,7 @@ app.get('/api/dashboard', async (req, res) => {
 
   // Atendimentos por hora
   const porHora = Array(24).fill(0);
-  for (const c of convs) { porHora[new Date(c.created_at).getHours()]++; }
+  for (const c of convs) { porHora[new Date(c.started_at || c.created_at).getHours()]++; }
 
   // Relatório por atendente (com mensagens enviadas)
   const msgCount = {};
@@ -294,7 +321,7 @@ app.post('/nova-conversa', async (req, res) => {
 
 // ─── Sync manual de clientes Hipcom (debug) ───
 app.post('/admin/sync-clientes', async (req, res) => {
-  if (req.query.key !== process.env.DASHBOARD_KEY) return res.status(401).json({ error: 'Não autorizado' });
+  if (!dashboardKeyValida(req)) return res.status(401).json({ error: 'Não autorizado' });
   try {
     const { sincronizarClientes } = require('./hipcomSync');
     await sincronizarClientes();
@@ -307,7 +334,7 @@ app.post('/admin/sync-clientes', async (req, res) => {
 
 // ─── Diagnóstico Hipcom (testa conexão e vars) ───
 app.get('/admin/hipcom-diag', async (req, res) => {
-  if (req.query.key !== process.env.DASHBOARD_KEY) return res.status(401).json({ error: 'Não autorizado' });
+  if (!dashboardKeyValida(req)) return res.status(401).json({ error: 'Não autorizado' });
   const axios = require('axios');
   const diag = {
     HIPCOM_URL:   process.env.HIPCOM_URL   || '(não definido)',
@@ -322,9 +349,12 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     const { count } = await sb2.from('hipcom_clientes').select('*', { count: 'exact', head: true });
     diag.supabase_clientes = `${count} registros`;
 
-    // Testa busca por CPF específico
-    const { data: cli } = await sb2.from('hipcom_clientes').select('nome,cpfcnpj,endereco,bairro').eq('cpfcnpj', '31317617843').single();
-    diag.busca_cpf_teste = cli ? `Encontrado: ${cli.nome} | ${cli.endereco}, ${cli.bairro}` : 'Não encontrado';
+    // Testa busca por CPF informado via ?cpf= (sem PII fixa no código)
+    const cpfTeste = String(req.query.cpf || '').replace(/\D/g, '');
+    if (cpfTeste) {
+      const { data: cli } = await sb2.from('hipcom_clientes').select('nome,cpfcnpj,endereco,bairro').eq('cpfcnpj', cpfTeste).single();
+      diag.busca_cpf_teste = cli ? `Encontrado: ${cli.nome} | ${cli.endereco}, ${cli.bairro}` : 'Não encontrado';
+    }
   } catch(e) { diag.supabase_erro = e.message; }
 
   try {

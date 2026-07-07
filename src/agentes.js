@@ -29,6 +29,7 @@ router.post('/auth/login', async (req, res) => {
   if (!ok) return res.status(401).json({ error: 'Email ou senha incorretos' });
 
   const token = gerarToken(agente);
+  if (!token) return res.status(503).json({ error: 'Servidor sem JWT_SECRET configurado. Contate o administrador.' });
   logger.info('Agente autenticado', { email: agente.email, nome: agente.nome });
   res.json({ token, agente: { id: agente.id, nome: agente.nome, email: agente.email, role: agente.role } });
 });
