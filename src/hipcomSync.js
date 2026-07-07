@@ -184,12 +184,18 @@ function normalizado(c) {
   };
 }
 
-// ─── Inicia sync periódico (a cada 1 hora) ───
+// ─── Inicia sync periódico (intervalo configurável, padrão 6h) ───
+// Espaçado para não sobrecarregar o servidor local do Hipcom. Ajuste via
+// HIPCOM_SYNC_INTERVAL_H (em horas). O sync é incremental após a 1ª execução.
+const SYNC_INTERVAL_H  = parseInt(process.env.HIPCOM_SYNC_INTERVAL_H || '6', 10);
+const SYNC_INTERVAL_MS = SYNC_INTERVAL_H * 60 * 60 * 1000;
+
 function iniciarSyncPeriodico() {
   sincronizarClientes().catch(err => logger.error('hipcomSync: erro inicial', { error: err.message }));
   setInterval(() => {
     sincronizarClientes().catch(err => logger.error('hipcomSync: erro periódico', { error: err.message }));
-  }, 60 * 60 * 1000);
+  }, SYNC_INTERVAL_MS);
+  logger.info('hipcomSync: agendado', { intervaloHoras: SYNC_INTERVAL_H });
 }
 
 module.exports = { iniciarSyncPeriodico, sincronizarClientes, buscarClienteLocal };

@@ -28,19 +28,23 @@ const HIPCOM_LOJA_PRECO  = parseInt(process.env.HIPCOM_PRICE_STORE  || '6', 10);
 const HIPCOM_LOJAS_ESTOQUE = (process.env.HIPCOM_STOCK_STORES || '1,6').split(',').map(Number).filter(Boolean);
 const HIPCOM_BLOCKED     = (process.env.HIPCOM_BLOCKED_ITEMS || '').split(',').map(s => s.trim()).filter(Boolean);
 
-// ─── Cache Redis compartilhado (TTL 5 min) ───
+// ─── Cache Redis compartilhado ───
+// TTLs mais longos = menos chamadas ao Hipcom (protege o servidor local).
+// Estoque fica curto (precisa ser fresco); produtos e ofertas ficam mais longos.
 const { Redis } = require('@upstash/redis');
 const _redis = new Redis({
   url: process.env.UPSTASH_REDIS_URL,
   token: process.env.UPSTASH_REDIS_TOKEN,
 });
-const CACHE_TTL = 5 * 60; // segundos
+const CACHE_TTL    = (parseInt(process.env.ESTOQUE_CACHE_MIN  || '5',  10)) * 60; // estoque
+const PRODUTOS_TTL = (parseInt(process.env.PRODUTOS_CACHE_MIN || '15', 10)) * 60; // busca de produtos
+const OFERTAS_TTL  = (parseInt(process.env.OFERTAS_CACHE_MIN  || '30', 10)) * 60; // ofertas do dia
 
 async function cacheGet(key) {
   try { return await _redis.get(key); } catch { return null; }
 }
-async function cacheSet(key, val) {
-  try { await _redis.set(key, val, { ex: CACHE_TTL }); } catch {}
+async function cacheSet(key, val, ttl = CACHE_TTL) {
+  try { await _redis.set(key, val, { ex: ttl }); } catch {}
 }
 
 // ─── Remove acentos para compatibilidade com a API (não suporta caracteres acentuados) ───
@@ -90,7 +94,7 @@ async function buscarProduto(termo) {
         ean:   p.codigo_barra ? String(p.codigo_barra) : null,
       }));
 
-    await cacheSet(chave, produtos);
+    await cacheSet(chave, produtos, PRODUTOS_TTL);
     return produtos;
   } catch (err) {
     logger.error('Erro ao buscar produto no Hipcom', { termo, error: err.message });
@@ -115,8 +119,11 @@ async function getProdutos() {
 
 // ─── Detecta o setor/seção do produto Hipcom (nome do campo varia por instalação) ───
 function detectarSetor(p) {
-  const cand = p.secao || p.nome_secao || p.descricao_secao || p.grupo || p.nome_grupo
-            || p.departamento || p.categoria || p.familia || p.setor;
+  const cand = p.departamento || p.nome_departamento || p.descricao_departamento || p.desc_departamento
+            || p.depto || p.nome_depto
+            || p.secao || p.nome_secao || p.descricao_secao
+            || p.grupo || p.nome_grupo || p.departamento_descricao
+            || p.categoria || p.familia || p.setor;
   return cand ? String(cand).trim() : null;
 }
 
@@ -144,7 +151,7 @@ async function getOfertas() {
         setor:        detectarSetor(p),
         ean:          p.codigo_barra ? String(p.codigo_barra) : null,
       }));
-    await cacheSet(chave, ofertas);
+    await cacheSet(chave, ofertas, OFERTAS_TTL);
     return ofertas;
   } catch (err) {
     logger.error('Erro ao buscar ofertas no Hipcom', { error: err.message });
