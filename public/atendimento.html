@@ -258,7 +258,14 @@
       margin-top: 8px; display: block; text-align: center; transition: color 0.2s;
     }
     .link-forgot:hover { color: var(--laranja); text-decoration: underline; }
-    .login-box .btn-olho { right: 14px; }
+    /* .login-box button é (0,1,1) — usa (0,2,0) para ganhar */
+    .login-box .btn-olho {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      width: auto; background: none; color: var(--cinza-3); padding: 4px 8px;
+      font-size: 16px; font-weight: 400; letter-spacing: 0; border-radius: 4px;
+      border: none; cursor: pointer; line-height: 1;
+    }
+    .login-box .btn-olho:hover { background: none; color: var(--laranja); }
   </style>
 </head>
 <body>
