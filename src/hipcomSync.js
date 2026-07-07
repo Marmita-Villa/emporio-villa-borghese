@@ -60,7 +60,12 @@ async function upsertClientes(clientes) {
   const rows = clientes.map(c => ({
     codigo:               c.codigo,
     loja:                 c.loja,
-    cpfcnpj:              (c.cpfcnpj || '').replace(/\D/g, '') || null,
+    cpfcnpj:              (() => {
+      const raw = String(c.cpfcnpj || '').replace(/\D/g, '');
+      if (!raw) return null;
+      // CPF tem 11 dígitos, CNPJ tem 14 — padeia com zero à esquerda se necessário
+      return raw.length <= 11 ? raw.padStart(11, '0') : raw.padStart(14, '0');
+    })(),
     nome:                 c.nome || null,
     email:                c.email || null,
     cep:                  (c.cep || '').replace(/\D/g, '') || null,
@@ -113,12 +118,14 @@ async function buscarClienteLocal(identificador) {
   // sb já importado no topo
   const apenasNums = identificador.replace(/\D/g, '');
 
-  // Tenta CPF/CNPJ
-  if (apenasNums.length >= 11) {
+  // Tenta CPF/CNPJ (com e sem zero à esquerda — Hipcom às vezes omite o zero inicial)
+  if (apenasNums.length >= 10) {
+    const cpfPadded = apenasNums.padStart(11, '0');
+    const cpfStrip  = apenasNums.replace(/^0+/, '') || apenasNums;
     const { data } = await sb
       .from('hipcom_clientes')
       .select('*')
-      .eq('cpfcnpj', apenasNums)
+      .or(`cpfcnpj.eq.${cpfPadded},cpfcnpj.eq.${cpfStrip}`)
       .gte('loja', 1)
       .limit(1)
       .single();
