@@ -31,35 +31,39 @@ function assinaturaMetaValida(req) {
   return crypto.timingSafeEqual(a, b);
 }
 
-// ─── Deduplicação de mensagens (evita reprocessar webhooks duplicados da Meta) ───
-const mensagensProcessadas = new Set();
-setInterval(() => mensagensProcessadas.clear(), 10 * 60 * 1000); // limpa a cada 10 min
+// ─── Redis compartilhado (dedupe + rate limit sobrevivem a restart e múltiplas instâncias) ───
+const { Redis } = require('@upstash/redis');
+const redis = new Redis({ url: process.env.UPSTASH_REDIS_URL, token: process.env.UPSTASH_REDIS_TOKEN });
 
-// ─── Rate limiting simples por número de telefone ───
-const rateLimitMap = new Map(); // phone → { count, resetAt }
-const RATE_LIMIT_MAX = 10;       // máximo de mensagens por janela
-const RATE_LIMIT_JANELA_MS = 60 * 1000; // janela de 1 minuto
+const DEDUP_TTL = 10 * 60;            // segundos que guardamos o id da mensagem
+const RATE_LIMIT_MAX = 10;            // máximo de mensagens por janela
+const RATE_LIMIT_JANELA_S = 60;       // janela de 1 minuto (segundos)
 
-function checkRateLimit(phone) {
-  const agora = Date.now();
-  const entrada = rateLimitMap.get(phone);
-
-  if (!entrada || agora > entrada.resetAt) {
-    rateLimitMap.set(phone, { count: 1, resetAt: agora + RATE_LIMIT_JANELA_MS });
+// Marca a mensagem como processada. Retorna false se já tinha sido vista (duplicada).
+// Fail-open: se o Redis falhar, deixa passar (melhor processar 2x do que ignorar o cliente).
+async function registrarMensagem(messageId) {
+  if (!messageId) return true;
+  try {
+    const ok = await redis.set(`dedup:${messageId}`, 1, { nx: true, ex: DEDUP_TTL });
+    return ok !== null; // null = chave já existia
+  } catch (err) {
+    logger.warn('Dedupe Redis falhou, processando mesmo assim', { error: err.message });
     return true;
   }
-
-  entrada.count++;
-  if (entrada.count > RATE_LIMIT_MAX) return false;
-  return true;
 }
 
-setInterval(() => {
-  const agora = Date.now();
-  for (const [phone, entrada] of rateLimitMap.entries()) {
-    if (agora > entrada.resetAt) rateLimitMap.delete(phone);
+// Incrementa o contador da janela do número. Retorna false se estourou o limite.
+async function checkRateLimit(phone) {
+  try {
+    const chave = `rate:${phone}`;
+    const count = await redis.incr(chave);
+    if (count === 1) await redis.expire(chave, RATE_LIMIT_JANELA_S);
+    return count <= RATE_LIMIT_MAX;
+  } catch (err) {
+    logger.warn('Rate limit Redis falhou, liberando', { error: err.message });
+    return true;
   }
-}, 5 * 60 * 1000);
+}
 
 // ─── Verificação do webhook (Meta exige isso na configuração inicial) ───
 app.get('/webhook', (req, res) => {
@@ -98,20 +102,19 @@ app.post('/webhook', async (req, res) => {
     const messageId = message.id;
 
     // Ignora mensagem já processada (webhook duplicado da Meta)
-    if (messageId && mensagensProcessadas.has(messageId)) {
+    if (!(await registrarMensagem(messageId))) {
       return res.sendStatus(200);
     }
-    if (messageId) mensagensProcessadas.add(messageId);
 
     // Bloqueia se o número ultrapassou o rate limit
-    if (!checkRateLimit(from)) {
+    if (!(await checkRateLimit(from))) {
       logger.warn(`Rate limit atingido`, { from });
       return res.sendStatus(200);
     }
 
     if (message.type === 'text' && text) {
       logger.info(`Mensagem recebida`, { from, text: text.substring(0, 80) });
-      await handleIncomingMessage(from, text);
+      await handleIncomingMessage(from, text, messageId);
     } else if (message.type !== 'text') {
       // Áudio, imagem, vídeo, sticker, localização, etc.
       await handleNonTextMessage(from, message.type);

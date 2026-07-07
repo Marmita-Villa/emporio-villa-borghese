@@ -16,6 +16,36 @@ const supabase = createClient(
 
 const SESSION_TTL = 15 * 60; // 15 minutos em segundos
 
+// ─── Rastreamento de inatividade ───
+// Sorted set com score = lastActivity. Só entram sessões em modo bot; ao expirar
+// (mais de INATIVIDADE_MS sem atividade) o cliente recebe msg_inatividade uma única vez.
+const ATIVIDADE_KEY = 'bot:atividade';
+const INATIVIDADE_MS = SESSION_TTL * 1000; // casa com o TTL da sessão
+const STEPS_BOT = ['menu', 'aguardando_escolha', 'ai'];
+
+async function trackAtividade(phone, ts) {
+  try { await redis.zadd(ATIVIDADE_KEY, { score: ts, member: phone }); }
+  catch (err) { logger.warn('Redis trackAtividade error', { phone, error: err.message }); }
+}
+
+async function untrackAtividade(phone) {
+  try { await redis.zrem(ATIVIDADE_KEY, phone); }
+  catch (err) { logger.warn('Redis untrackAtividade error', { phone, error: err.message }); }
+}
+
+// Retorna os telefones inativos há mais de INATIVIDADE_MS e os remove do set (notifica 1x)
+async function pegarInativos(agora) {
+  try {
+    const limite = agora - INATIVIDADE_MS;
+    const inativos = await redis.zrange(ATIVIDADE_KEY, 0, limite, { byScore: true });
+    if (inativos && inativos.length) await redis.zrem(ATIVIDADE_KEY, ...inativos);
+    return inativos || [];
+  } catch (err) {
+    logger.warn('Redis pegarInativos error', { error: err.message });
+    return [];
+  }
+}
+
 // ──────────────────────────────────────────
 // SESSÕES — Redis
 // ──────────────────────────────────────────
@@ -35,6 +65,12 @@ async function getSession(phone) {
 async function saveSession(session) {
   try {
     await redis.set(`session:${session.phone}`, session, { ex: SESSION_TTL });
+    // Rastreia inatividade só em modo bot; em atendimento humano/finalizado, para de rastrear
+    if (STEPS_BOT.includes(session.step)) {
+      await trackAtividade(session.phone, session.lastActivity || Date.now());
+    } else {
+      await untrackAtividade(session.phone);
+    }
   } catch (err) {
     logger.error('Redis saveSession error', { phone: session.phone, error: err.message });
   }
@@ -43,6 +79,7 @@ async function saveSession(session) {
 async function deleteSession(phone) {
   try {
     await redis.del(`session:${phone}`);
+    await untrackAtividade(phone);
   } catch (err) {
     logger.error('Redis deleteSession error', { phone, error: err.message });
   }
@@ -153,4 +190,5 @@ module.exports = {
   salvarConversa,
   salvarPedido,
   salvarMensagemHumana,
+  pegarInativos,
 };

@@ -20,15 +20,16 @@ const api = axios.create({
   httpsAgent: new https.Agent({ keepAlive: false }),
 });
 
-// ─── Cache simples em memória (TTL 5 min) ───
-const _cache = new Map();
-function cacheGet(key) {
-  const entry = _cache.get(key);
-  if (!entry) return null;
-  if (Date.now() - entry.ts > 5 * 60 * 1000) { _cache.delete(key); return null; }
-  return entry.val;
+// ─── Cache Redis compartilhado (TTL 5 min) ───
+const { Redis } = require('@upstash/redis');
+const _redis = new Redis({ url: process.env.UPSTASH_REDIS_URL, token: process.env.UPSTASH_REDIS_TOKEN });
+const CACHE_TTL = 5 * 60; // segundos
+async function cacheGet(key) {
+  try { return await _redis.get(key); } catch { return null; }
 }
-function cacheSet(key, val) { _cache.set(key, { val, ts: Date.now() }); }
+async function cacheSet(key, val) {
+  try { await _redis.set(key, val, { ex: CACHE_TTL }); } catch {}
+}
 
 function removerAcentos(texto) {
   return texto.normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -45,7 +46,7 @@ function normalizarTelefone(tel) {
 // TODO: ajustar endpoint conforme documentação da nova API
 async function buscarCliente(identificador) {
   const chave = `v1:cliente:${identificador}`;
-  const cached = cacheGet(chave);
+  const cached = await cacheGet(chave);
   if (cached) return cached;
 
   const apenasNumeros = identificador.replace(/\D/g, '');
@@ -55,7 +56,7 @@ async function buscarCliente(identificador) {
 
   try {
     const res = await api.get('/clientes/buscar', { params });
-    if (res.data) { cacheSet(chave, res.data); return res.data; }
+    if (res.data) { await cacheSet(chave, res.data); return res.data; }
   } catch (err) {
     const status = err.response?.status;
     if (status === 404 || status === 400) return null;
@@ -68,7 +69,7 @@ async function buscarCliente(identificador) {
 // TODO: ajustar endpoint conforme documentação da nova API
 async function buscarProduto(termo) {
   const chave = `v1:prod:${removerAcentos(termo.trim().toLowerCase())}`;
-  const cached = cacheGet(chave);
+  const cached = await cacheGet(chave);
   if (cached) return cached;
 
   try {
@@ -77,7 +78,7 @@ async function buscarProduto(termo) {
       params: { q: termoLimpo, limit: 8 },
     });
     const result = Array.isArray(res.data) ? res.data : (res.data ? [res.data] : []);
-    cacheSet(chave, result);
+    await cacheSet(chave, result);
     return result;
   } catch (err) {
     logger.error('[v1] Erro ao buscar produto', { termo, error: err.message });
@@ -89,12 +90,12 @@ async function buscarProduto(termo) {
 // TODO: ajustar endpoint conforme documentação da nova API
 async function verificarEstoque(produtoId) {
   const chave = `v1:estoque:${produtoId}`;
-  const cached = cacheGet(chave);
+  const cached = await cacheGet(chave);
   if (cached) return cached;
 
   try {
     const res = await api.get(`/produtos/${produtoId}/estoque`);
-    cacheSet(chave, res.data);
+    await cacheSet(chave, res.data);
     return res.data;
   } catch (err) {
     logger.warn('[v1] verificar_estoque falhou, assumindo disponível', { produtoId, error: err.message });

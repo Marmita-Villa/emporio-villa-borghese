@@ -24,9 +24,11 @@ async function clearSession(phone) {
   await db.clearSession(phone);
 }
 
-// verificarSessoesExpiradas não é mais necessária — o Redis expira automaticamente via TTL
+// Retorna sessões de bot inativas (para notificar o cliente com msg_inatividade uma única vez).
+// A expiração real da sessão continua a cargo do TTL do Redis; isto só cobre o aviso ao cliente.
 async function verificarSessoesExpiradas() {
-  return [];
+  const inativos = await db.pegarInativos(Date.now());
+  return inativos.map(phone => ({ phone }));
 }
 
 module.exports = { getOrCreateSession, addMessageToSession, clearSession, verificarSessoesExpiradas };

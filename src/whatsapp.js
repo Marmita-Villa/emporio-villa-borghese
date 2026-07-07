@@ -44,7 +44,7 @@ async function enviarMensagem(para, texto) {
 }
 
 // ─── Orquestra o fluxo de atendimento para mensagens de texto ───
-async function handleIncomingMessage(phone, texto) {
+async function handleIncomingMessage(phone, texto, messageId) {
   const session = await getOrCreateSession(phone);
 
   // Quando em atendimento humano: salva mensagem e não responde (agente responde pelo painel)
@@ -54,7 +54,7 @@ async function handleIncomingMessage(phone, texto) {
     return;
   }
 
-  await enviarIndicadorDigitando(phone);
+  await enviarIndicadorDigitando(messageId);
 
   try {
     const resposta = await processarMensagem(session, texto);
@@ -85,17 +85,21 @@ async function handleNonTextMessage(phone, type) {
   await enviarMensagem(phone, resposta);
 }
 
-// ─── Envia status "digitando..." ───
-async function enviarIndicadorDigitando(para) {
+// ─── Marca a mensagem como lida e mostra o "digitando..." nativo ───
+// A WhatsApp Cloud API exige o message_id da mensagem recebida. Dura ~25s ou
+// até enviarmos a resposta. Sem messageId (ex: chat de teste), não faz nada.
+async function enviarIndicadorDigitando(messageId) {
+  if (!messageId) return;
   try {
     await axios.post(
       `https://graph.facebook.com/v25.0/${PHONE_NUMBER_ID}/messages`,
       {
         messaging_product: 'whatsapp',
-        to: para,
-        type: 'reaction', // workaround — WhatsApp Cloud API não tem "typing" nativo
+        status: 'read',
+        message_id: messageId,
+        typing_indicator: { type: 'text' },
       },
-      { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}` } }
+      { headers: { Authorization: `Bearer ${WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' } }
     );
   } catch (_) { /* silencioso — não é crítico */ }
 }
