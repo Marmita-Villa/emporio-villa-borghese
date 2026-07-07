@@ -357,6 +357,18 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     if (cpfTeste) {
       const { data: cli } = await sb2.from('hipcom_clientes').select('nome,cpfcnpj,endereco,bairro').eq('cpfcnpj', cpfTeste).single();
       diag.busca_cpf_teste = cli ? `Encontrado: ${cli.nome} | ${cli.endereco}, ${cli.bairro}` : 'Não encontrado';
+
+      // Resposta crua da API de delivery com histórico — confirma os campos que a IA vai usar
+      try {
+        const r = await axios.get(`${process.env.SISTEMA_API_URL || 'https://api.emporiovillaborghese.com.br'}/clientes/buscar`, {
+          params: { cpf: cpfTeste, incluir_historico: true },
+          headers: { Authorization: `Bearer ${process.env.SISTEMA_API_TOKEN}` },
+          timeout: 8000,
+        });
+        diag.delivery_historico = r.data;
+      } catch (e2) {
+        diag.delivery_historico = `ERRO: ${e2.response?.status || ''} ${e2.response?.data ? JSON.stringify(e2.response.data) : e2.message}`;
+      }
     }
   } catch(e) { diag.supabase_erro = e.message; }
 
