@@ -132,14 +132,42 @@ async function verificarEstoque(produtoId) {
   }
 }
 
-// ─── B.1 — Busca cliente no Supabase (sincronizado do Hipcom via hipcomSync.js) ───
+// ─── B.1 — Busca cliente: cadastro no Supabase (base completa do Hipcom) + histórico na API de delivery ───
 async function buscarCliente(identificador) {
   try {
     const { buscarClienteLocal } = require('./hipcomSync');
-    return await buscarClienteLocal(identificador);
+    const cliente = await buscarClienteLocal(identificador);
+    if (!cliente) return null;
+    await enriquecerHistorico(cliente); // adiciona total_pedidos, ultimo_pedido, favoritos, etc.
+    return cliente;
   } catch (err) {
     logger.error('Erro ao buscar cliente', { identificador, error: err.message });
     return null;
+  }
+}
+
+// ─── B.2 — Enriquece o cliente com histórico da API de delivery (incluir_historico=true) ───
+// Cliente que existe no ERP mas nunca pediu no delivery volta sem histórico → tratado como novo.
+async function enriquecerHistorico(cliente) {
+  try {
+    const cpf = String(cliente.cpf || '').replace(/\D/g, '');
+    const tel = String(cliente.telefone || '').replace(/\D/g, '');
+    const params = { incluir_historico: true };
+    if (cpf) params.cpf = cpf;
+    else if (tel) params.telefone = tel;
+    else return;
+
+    const res = await api.get('/clientes/buscar', { params });
+    const data = Array.isArray(res.data) ? res.data[0] : res.data;
+    if (!data) return;
+
+    // Copia apenas os campos de histórico/preferência que a IA usa (sobrescreve só se vierem)
+    for (const campo of ['total_pedidos', 'ultimo_pedido', 'favoritos', 'favoritos_em_oferta', 'forma_pagamento_preferida']) {
+      if (data[campo] != null) cliente[campo] = data[campo];
+    }
+  } catch (err) {
+    // Sem histórico não é erro fatal — o atendimento segue com os dados cadastrais
+    logger.warn('Não foi possível enriquecer histórico do cliente', { error: err.response?.status || err.message });
   }
 }
 
