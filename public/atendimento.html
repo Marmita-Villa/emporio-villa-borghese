@@ -241,6 +241,24 @@
       .chat-area.show { display: flex; }
       .form-row { grid-template-columns: 1fr; }
     }
+
+    /* ── Senha com olhinho ── */
+    .senha-wrap { position: relative; }
+    .btn-olho {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; color: var(--cinza-3);
+      font-size: 16px; padding: 4px; line-height: 1; transition: color 0.2s;
+      width: auto; font-weight: 400; letter-spacing: 0; border-radius: 4px;
+    }
+    .btn-olho:hover { color: var(--laranja); background: none; }
+    .senha-wrap input { padding-right: 42px !important; margin-bottom: 0 !important; }
+    .login-box .senha-wrap { margin-bottom: 12px; }
+    .link-forgot {
+      font-size: 12px; color: var(--cinza-3); text-decoration: none;
+      margin-top: 8px; display: block; text-align: center; transition: color 0.2s;
+    }
+    .link-forgot:hover { color: var(--laranja); text-decoration: underline; }
+    .login-box .btn-olho { right: 14px; }
   </style>
 </head>
 <body>
@@ -251,8 +269,12 @@
     <img src="/logo.png" class="login-logo-img" alt="Empório Villa Borghese">
     <div class="login-sub">Painel de Atendimento</div>
     <input type="email" id="login-email" placeholder="Seu e-mail" autocomplete="email" />
-    <input type="password" id="login-senha" placeholder="Senha" />
+    <div class="senha-wrap">
+      <input type="password" id="login-senha" placeholder="Senha" />
+      <button class="btn-olho" type="button" onclick="toggleSenha('login-senha',this)" tabindex="-1">👁</button>
+    </div>
     <button onclick="fazerLogin()">Entrar</button>
+    <a href="#" class="link-forgot" onclick="esqueceuSenha();return false">Esqueci minha senha</a>
     <div class="login-erro" id="login-erro"></div>
   </div>
 </div>
@@ -363,6 +385,31 @@
       </div>
     </div>
 
+    <!-- Modal: Alterar Senha -->
+    <div id="modal-alterar-senha" class="modal-overlay">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>🔑 Alterar Senha</h3>
+          <button class="modal-close" onclick="fecharModalAlterarSenha()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p id="alterar-senha-nome" style="font-size:14px;font-weight:600;color:var(--texto);margin-bottom:16px"></p>
+          <div class="senha-wrap" style="margin-bottom:12px">
+            <input type="password" id="nova-senha" placeholder="Nova senha"
+              style="width:100%;padding:11px 42px 11px 14px;border:1.5px solid var(--cinza-2);border-radius:8px;font-size:13px;outline:none;font-family:inherit;background:var(--creme)" />
+            <button class="btn-olho" type="button" onclick="toggleSenha('nova-senha',this)" tabindex="-1">👁</button>
+          </div>
+          <div class="senha-wrap" style="margin-bottom:16px">
+            <input type="password" id="nova-senha-conf" placeholder="Confirmar nova senha"
+              style="width:100%;padding:11px 42px 11px 14px;border:1.5px solid var(--cinza-2);border-radius:8px;font-size:13px;outline:none;font-family:inherit;background:var(--creme)" />
+            <button class="btn-olho" type="button" onclick="toggleSenha('nova-senha-conf',this)" tabindex="-1">👁</button>
+          </div>
+          <div id="alterar-senha-msg" style="font-size:13px;margin-bottom:12px;min-height:18px"></div>
+          <button class="btn-criar" onclick="salvarNovaSenha()" style="width:100%">Salvar nova senha</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Agentes (admin) -->
     <div id="view-agentes" style="display:none; flex:1">
       <div class="admin-panel">
@@ -374,7 +421,10 @@
             <input type="email" id="f-email" placeholder="E-mail" />
           </div>
           <div class="form-row">
-            <input type="password" id="f-senha" placeholder="Senha" />
+            <div class="senha-wrap">
+              <input type="password" id="f-senha" placeholder="Senha" />
+              <button class="btn-olho" type="button" onclick="toggleSenha('f-senha',this)" tabindex="-1">👁</button>
+            </div>
             <select id="f-role">
               <option value="agent">Atendente</option>
               <option value="admin">Administrador</option>
@@ -890,6 +940,49 @@
   document.getElementById('modal-conversa').addEventListener('click', function(e) { if (e.target === this) fecharModal(); });
   document.getElementById('modal-transferir').addEventListener('click', function(e) { if (e.target === this) fecharModalTransferir(); });
   document.getElementById('modal-tags').addEventListener('click', function(e) { if (e.target === this) fecharModalTags(); });
+  document.getElementById('modal-alterar-senha').addEventListener('click', function(e) { if (e.target === this) fecharModalAlterarSenha(); });
+
+  // ── Olhinho senha ──
+  function toggleSenha(inputId, btn) {
+    const inp = document.getElementById(inputId);
+    if (!inp) return;
+    const mostrar = inp.type === 'password';
+    inp.type = mostrar ? 'text' : 'password';
+    btn.textContent = mostrar ? '🙈' : '👁';
+  }
+
+  // ── Esqueci minha senha ──
+  function esqueceuSenha() {
+    alert('Entre em contato com o administrador para redefinir sua senha.');
+  }
+
+  // ── Alterar senha (admin) ──
+  let agenteParaAlterarSenha = null;
+  function abrirModalAlterarSenha(id, nome) {
+    agenteParaAlterarSenha = id;
+    document.getElementById('alterar-senha-nome').textContent = '👤 ' + nome;
+    document.getElementById('nova-senha').value = '';
+    document.getElementById('nova-senha-conf').value = '';
+    document.getElementById('alterar-senha-msg').textContent = '';
+    document.getElementById('modal-alterar-senha').style.display = 'flex';
+    setTimeout(() => document.getElementById('nova-senha').focus(), 100);
+  }
+  function fecharModalAlterarSenha() {
+    document.getElementById('modal-alterar-senha').style.display = 'none';
+    agenteParaAlterarSenha = null;
+  }
+  async function salvarNovaSenha() {
+    const senha = document.getElementById('nova-senha').value;
+    const conf  = document.getElementById('nova-senha-conf').value;
+    const msg   = document.getElementById('alterar-senha-msg');
+    if (!senha) { msg.style.color = '#c0392b'; msg.textContent = 'Digite a nova senha'; return; }
+    if (senha.length < 6) { msg.style.color = '#c0392b'; msg.textContent = 'Senha deve ter ao menos 6 caracteres'; return; }
+    if (senha !== conf) { msg.style.color = '#c0392b'; msg.textContent = 'As senhas não coincidem'; return; }
+    const res = await api(`/agentes/${agenteParaAlterarSenha}`, { method: 'PATCH', body: JSON.stringify({ senha }) });
+    if (res.error) { msg.style.color = '#c0392b'; msg.textContent = res.error; return; }
+    msg.style.color = '#27ae60'; msg.textContent = '✅ Senha alterada com sucesso!';
+    setTimeout(() => fecharModalAlterarSenha(), 1500);
+  }
 
   // ── Admin: Agentes ──
   async function carregarAgentes() {
@@ -901,9 +994,12 @@
         <td style="color:#636e72">${a.email}</td>
         <td><span class="role-badge ${a.role}">${a.role === 'admin' ? 'Admin' : 'Atendente'}</span></td>
         <td><span class="toggle-btn ${a.ativo ? 'ativo' : 'inativo'}">${a.ativo ? 'Ativo' : 'Inativo'}</span></td>
-        <td>
+        <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button class="toggle-btn ${a.ativo ? 'inativo' : 'ativo'}" onclick="toggleAgente('${a.id}', ${!a.ativo})">
             ${a.ativo ? 'Desativar' : 'Ativar'}
+          </button>
+          <button class="toggle-btn" style="background:#e8f4fd;color:#2980b9" onclick="abrirModalAlterarSenha('${a.id}','${a.nome.replace(/'/g, "\\'")}')">
+            🔑 Senha
           </button>
         </td>
       </tr>`).join('');
