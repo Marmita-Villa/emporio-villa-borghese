@@ -36,7 +36,7 @@ const _redis = new Redis({
   url: process.env.UPSTASH_REDIS_URL,
   token: process.env.UPSTASH_REDIS_TOKEN,
 });
-const CACHE_TTL    = (parseInt(process.env.ESTOQUE_CACHE_MIN  || '5',  10)) * 60; // estoque
+const CACHE_TTL    = (parseInt(process.env.ESTOQUE_CACHE_MIN  || '10', 10)) * 60; // estoque
 const PRODUTOS_TTL = (parseInt(process.env.PRODUTOS_CACHE_MIN || '15', 10)) * 60; // busca de produtos
 const OFERTAS_TTL  = (parseInt(process.env.OFERTAS_CACHE_MIN  || '30', 10)) * 60; // ofertas do dia
 
