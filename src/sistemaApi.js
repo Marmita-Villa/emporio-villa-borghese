@@ -79,8 +79,11 @@ async function buscarProduto(termo) {
   const cached = await cacheGet(chave);
   if (cached) return cached;
   try {
-    const termoLimpo = termo.trim();
-    const params = pareceCodBarras(termoLimpo)
+    const termoOriginal = termo.trim();
+    const ehCodBarras = pareceCodBarras(termoOriginal);
+    // O Hipcom não trata acentos ("pão francês" não bate com "PAO FRANCES * KG") — remove antes de buscar
+    const termoLimpo = ehCodBarras ? termoOriginal : removerAcentos(termoOriginal);
+    const params = ehCodBarras
       ? { loja: HIPCOM_LOJA_PRECO, plu: termoLimpo, somente_estoque_positivo: 'S' }
       : { loja: HIPCOM_LOJA_PRECO, descricao: termoLimpo, somente_estoque_positivo: 'S', limite: 8 };
 
