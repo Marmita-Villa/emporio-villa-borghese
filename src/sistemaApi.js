@@ -73,6 +73,16 @@ function pareceCodBarras(termo) {
   return /^\d{8,13}$/.test(termo.trim());
 }
 
+// ─── Apelidos de busca: nome que o cliente usa → termo que existe na descrição do Hipcom ───
+// Chaves já sem acento e minúsculas (comparação feita após removerAcentos). Adicione livremente.
+const APELIDOS_PRODUTO = {
+  'pao':          'pao frances',
+  'pãozinho':     'pao frances', // fica aqui por clareza; removerAcentos ja normaliza antes da comparação
+  'paozinho':     'pao frances',
+  'media':        'pao frances',
+  'pao de sal':   'pao frances',
+};
+
 // ─── A.1 — Busca produtos por nome ou código de barras via Hipcom ───
 async function buscarProduto(termo) {
   const chave = `prod:${termo.trim().toLowerCase()}`;
@@ -82,7 +92,12 @@ async function buscarProduto(termo) {
     const termoOriginal = termo.trim();
     const ehCodBarras = pareceCodBarras(termoOriginal);
     // O Hipcom não trata acentos ("pão francês" não bate com "PAO FRANCES * KG") — remove antes de buscar
-    const termoLimpo = ehCodBarras ? termoOriginal : removerAcentos(termoOriginal);
+    let termoLimpo = ehCodBarras ? termoOriginal : removerAcentos(termoOriginal);
+    // Aplica apelido se o termo (normalizado) bater exatamente com um apelido cadastrado
+    if (!ehCodBarras) {
+      const apelido = APELIDOS_PRODUTO[termoLimpo.toLowerCase()];
+      if (apelido) termoLimpo = apelido;
+    }
     const params = ehCodBarras
       ? { loja: HIPCOM_LOJA_PRECO, plu: termoLimpo, somente_estoque_positivo: 'S' }
       : { loja: HIPCOM_LOJA_PRECO, descricao: termoLimpo, somente_estoque_positivo: 'S', limite: 8 };
