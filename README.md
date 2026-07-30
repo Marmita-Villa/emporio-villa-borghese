@@ -171,7 +171,7 @@ ngrok http 3000
 Para mudar o comportamento da atendente, edite a função `getSystemPrompt()` em `src/ia.js`.
 
 Você pode:
-- Mudar o nome da atendente (atualmente "Mari")
+- Mudar o nome da atendente (atualmente "mAIthe")
 - Ajustar o tom de comunicação
 - Adicionar horário de funcionamento
 - Incluir promoções ou políticas da loja

@@ -90,7 +90,7 @@ async function processarMensagem(session, texto) {
       return [await getMsg('msg_boas_vindas_humano'), await getMsg('msg_formulario_humano')];
     }
 
-    return `Não entendi 😅 Por favor, escolha:\n\n1️⃣ *mAI* — Atendente virtual\n2️⃣ *Atendente humano*\n\nDigite *1* ou *2*`;
+    return `Não entendi 😅 Por favor, escolha:\n\n1️⃣ *mAIthe* — Atendente virtual\n2️⃣ *Atendente humano*\n\nDigite *1* ou *2*`;
   }
 
   // ── Modo humano: aguarda formulário preenchido ──
@@ -100,7 +100,7 @@ async function processarMensagem(session, texto) {
       return [await getMsg('msg_boas_vindas_maithe'), await getMsg('msg_formulario_humano')];
     }
     logger.info(`Formulário humano recebido`, { phone: session.phone });
-    return `Recebemos seu pedido! ✅\n\nUm de nossos atendentes vai te chamar em breve para confirmar tudo. 😊\n\nSe mudar de ideia, manda *1* para falar com a mAI agora.`;
+    return `Recebemos seu pedido! ✅\n\nUm de nossos atendentes vai te chamar em breve para confirmar tudo. 😊\n\nSe mudar de ideia, manda *1* para falar com a mAIthe agora.`;
   }
 
   // ── Pedido concluído ──
