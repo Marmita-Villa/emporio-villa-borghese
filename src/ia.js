@@ -6,6 +6,17 @@ const logger = require('./logger');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// ─── Detecta endereço "molde" (a IA copiou o exemplo de formato do prompt sem preencher) ───
+// Um endereço real nunca tem "Bairro"/"Cidade"/"UF" como segmento isolado entre vírgulas,
+// nem contém literalmente "Rua X", "nº Y" ou "Cidade/UF".
+function pareceEnderecoModelo(endereco) {
+  const texto = String(endereco || '');
+  const segmentosModelo = ['bairro', 'cidade', 'uf', 'cidade/uf'];
+  const partes = texto.split(',').map(s => s.trim().toLowerCase());
+  if (partes.some(p => segmentosModelo.includes(p))) return true;
+  return /rua x\b/i.test(texto) || /n[ºo°]?\s*y\b/i.test(texto) || /cidade\/uf/i.test(texto);
+}
+
 // ─── Cache de demanda (TTL 3 min) para evitar chamada à API a cada mensagem ───
 let _demandaCache = null;
 let _demandaCacheTs = 0;
@@ -277,6 +288,13 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
   }
 
   if (nomeFerramenta === 'finalizar_pedido') {
+    // Bloqueia endereço "molde" não preenchido (ex: a IA copiou o exemplo de formato do
+    // prompt sem substituir pelos dados reais — já aconteceu e gravou lixo no cadastro do cliente)
+    if (pareceEnderecoModelo(inputs.endereco)) {
+      logger.warn('Endereço parece template não preenchido — pedido bloqueado', { phone: session.phone, endereco: inputs.endereco });
+      return `ERRO: o endereço "${inputs.endereco}" parece um exemplo de formato, não um endereço real (ex: contém a palavra "Bairro" ou "Cidade/UF" sem um valor real). NÃO finalize o pedido. Peça o endereço completo e real ao cliente (rua, número, bairro, cidade/UF, CEP) antes de tentar novamente.`;
+    }
+
     // Corrige IDs inventados usando o productMap da sessão (busca por nome do item)
     const map = session.productMap || {};
     const itensCorrigidos = inputs.itens.map(item => {
@@ -357,7 +375,7 @@ AO RECEBER A IDENTIFICAÇÃO DO CLIENTE:
    - Pergunte o que deseja pedir hoje de forma natural
 3. Se não encontrar cadastro: NÃO diga que houve erro técnico ou problema no sistema. Simplesmente cumprimente pelo nome, diga "Não encontrei seu cadastro, mas pode deixar que te atendo normalmente!" e pergunte o que deseja pedir. Trate como novo cliente sem fazer drama.
 4. ENDEREÇO E PAGAMENTO:
-   - Se o cadastro tiver endereço: USE-O automaticamente — NUNCA peça o endereço novamente. Apenas pergunte se quer entregar no endereço cadastrado OU se mudou: "Entrego no endereço cadastrado (Rua X, nº Y, Bairro, Cidade/UF, CEP) — tá certo ou mudou?"
+   - Se o cadastro tiver endereço: USE-O automaticamente — NUNCA peça o endereço novamente. Pergunte se quer entregar no endereço cadastrado OU se mudou, citando o endereço REAL do cliente (nunca um exemplo genérico). Ex.: "Entrego no endereço cadastrado (Rua Tal, nº 123, Bairro Tal, Cidade/UF) — tá certo ou mudou?" — SUBSTITUA "Rua Tal, nº 123, Bairro Tal, Cidade/UF" pelos dados reais do cadastro do cliente. JAMAIS envie esse texto de exemplo literalmente (nunca escreva a palavra "Bairro" sozinha, sem um nome de bairro de verdade depois).
    - Se o cliente confirmar o endereço: use o endereço COMPLETO do cadastro (incluindo CEP), parta para a forma de pagamento
    - Se o cadastro tiver forma de pagamento preferida: sugira ela ("Vai ser no Pix como de costume?")
    - Só peça endereço completo se for novo cliente ou se o cliente quiser mudar
