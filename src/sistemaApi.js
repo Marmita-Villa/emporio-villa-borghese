@@ -96,23 +96,33 @@ function apelidoFlexivel(termoNormalizado) {
 }
 
 // ─── Palavras "cabeça" que o Hipcom abrevia na descrição do produto ───
-// Comprovado: requeijão vira "REQJ." (ex: "REQJ. CREMOSO DANONE REGULAR 200G") e
-// queijo vira "QJ." (ex: "QJ. EMMENTAL POLENGHI KG"). Buscar a palavra completa nunca
-// bate por substring. Adicione aqui outras categorias com o mesmo padrão se aparecerem.
-// Cada entrada aceita singular e plural (comum o cliente/IA perguntar "quais requeijões vocês têm?")
+// Comprovado: requeijão vira "REQJ.", queijo vira "QJ." e chocolate vira "CHOC."
+// (ex: "CHOC. LINDT LINDOR AO LEITE CAIXA 112G"). Buscar a palavra completa nunca bate
+// por substring. Adicione aqui outras categorias com o mesmo padrão se aparecerem.
+// Cada entrada aceita singular e plural (comum perguntar "quais requeijões vocês têm?")
 const CABECA_ABREVIADA = {
   'requeijao':  'reqj',
   'requeijoes': 'reqj',
   'queijo':     'qj',
   'queijos':    'qj',
+  'chocolate':  'choc',
+  'chocolates': 'choc',
 };
+
+// Palavras que o cliente costuma usar mas que quase nunca aparecem na descrição do
+// Hipcom (ex: "barra", "de", "pacote") — ignoradas ao filtrar por marca/variação, pra
+// não derrubar o match só porque uma palavra de contexto não existe no catálogo.
+const PALAVRAS_IGNORAVEIS = new Set(['de', 'do', 'da', 'e', 'a', 'o', 'com', 'para', 'um', 'uma', 'barra', 'barrinha', 'tablete', 'pacote']);
 
 // Separa a palavra-cabeça (se houver) do resto do termo (ex: marca, "light", "zero lactose")
 function separarCabecaEResto(termoNormalizado) {
   const palavras = termoNormalizado.toLowerCase().split(/\s+/).filter(Boolean);
   for (const [cabeca, abreviacao] of Object.entries(CABECA_ABREVIADA)) {
     const idx = palavras.indexOf(cabeca);
-    if (idx !== -1) return { abreviacao, resto: palavras.filter((_, i) => i !== idx) };
+    if (idx !== -1) {
+      const resto = palavras.filter((_, i) => i !== idx).filter(p => !PALAVRAS_IGNORAVEIS.has(p));
+      return { abreviacao, resto };
+    }
   }
   return null;
 }
@@ -164,10 +174,19 @@ async function buscarProduto(termo) {
       // (comprovado: só requeijão tem 40+ variantes cadastradas) — 8 esconderia quase tudo.
       const LIMITE_CATEGORIA = 25;
       if (cabecaInfo.resto.length) {
-        const filtrados = todos.filter(p => {
-          const nomeNorm = removerAcentos(p.nome).toLowerCase();
-          return cabecaInfo.resto.every(palavra => nomeNorm.includes(palavra));
-        });
+        // Basta bater com AO MENOS UMA palavra extra (não todas) — algumas palavras que o
+        // cliente/IA usa (ex: "assorted", termos de variação incomuns) podem não aparecer
+        // literalmente na descrição; exigir 100% derrubava marcas que deveriam aparecer.
+        // Ordena pelos que batem em mais palavras primeiro (mais relevantes no topo).
+        const pontuados = todos
+          .map(p => {
+            const nomeNorm = removerAcentos(p.nome).toLowerCase();
+            const matches = cabecaInfo.resto.filter(palavra => nomeNorm.includes(palavra)).length;
+            return { produto: p, matches };
+          })
+          .filter(x => x.matches > 0)
+          .sort((a, b) => b.matches - a.matches);
+        const filtrados = pontuados.map(x => x.produto);
         // Sem match da marca/variação pedida: mostra a categoria inteira como alternativa
         produtos = (filtrados.length ? filtrados : todos).slice(0, LIMITE_CATEGORIA);
       } else {
