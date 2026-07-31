@@ -172,13 +172,17 @@ async function buscarProdutoLocal(termo, opts = {}) {
   // Escolher uma única palavra "principal" falha sempre que ela não existe no vocabulário
   // abreviado do Hipcom mas outra (ex: marca) existe — foi exatamente o bug encontrado.
   const orFiltro = palavrasRelevantes.map(p => `descricao_normalizada.ilike.%${p}%`).join(',');
+  // Limite alto: uma palavra sozinha (ex: "choc") pode bater em milhares de linhas —
+  // um corte baixo aqui excluiria candidatos reais (ex: outras marcas de chocolate) ANTES
+  // da pontuação por múltiplas palavras rodar. A busca é local/indexada (trigram), então um
+  // limite generoso ainda é rápido — o corte que importa pro cliente é o final (`limite`).
   const { data, error } = await sb
     .from('hipcom_produtos')
     .select('plu,descricao,descricao_normalizada,preco,preco_promocao,estoque,fracionado,ativo,ean,departamento')
     .eq('loja', HIPCOM_LOJA)
     .eq('ativo', 'S')
     .or(orFiltro)
-    .limit(500);
+    .limit(5000);
 
   if (error) {
     logger.error('hipcomProdutosSync: erro na busca local', { termo, error: error.message });
