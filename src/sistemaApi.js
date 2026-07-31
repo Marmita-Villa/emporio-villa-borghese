@@ -99,9 +99,12 @@ function apelidoFlexivel(termoNormalizado) {
 // Comprovado: requeijão vira "REQJ." (ex: "REQJ. CREMOSO DANONE REGULAR 200G") e
 // queijo vira "QJ." (ex: "QJ. EMMENTAL POLENGHI KG"). Buscar a palavra completa nunca
 // bate por substring. Adicione aqui outras categorias com o mesmo padrão se aparecerem.
+// Cada entrada aceita singular e plural (comum o cliente/IA perguntar "quais requeijões vocês têm?")
 const CABECA_ABREVIADA = {
-  'requeijao': 'reqj',
-  'queijo':    'qj',
+  'requeijao':  'reqj',
+  'requeijoes': 'reqj',
+  'queijo':     'qj',
+  'queijos':    'qj',
 };
 
 // Separa a palavra-cabeça (se houver) do resto do termo (ex: marca, "light", "zero lactose")
