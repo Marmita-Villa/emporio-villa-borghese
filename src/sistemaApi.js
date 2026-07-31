@@ -95,6 +95,40 @@ function apelidoFlexivel(termoNormalizado) {
   return null;
 }
 
+// ─── Palavras "cabeça" que o Hipcom abrevia na descrição do produto ───
+// Comprovado: requeijão vira "REQJ." (ex: "REQJ. CREMOSO DANONE REGULAR 200G") e
+// queijo vira "QJ." (ex: "QJ. EMMENTAL POLENGHI KG"). Buscar a palavra completa nunca
+// bate por substring. Adicione aqui outras categorias com o mesmo padrão se aparecerem.
+const CABECA_ABREVIADA = {
+  'requeijao': 'reqj',
+  'queijo':    'qj',
+};
+
+// Separa a palavra-cabeça (se houver) do resto do termo (ex: marca, "light", "zero lactose")
+function separarCabecaEResto(termoNormalizado) {
+  const palavras = termoNormalizado.toLowerCase().split(/\s+/).filter(Boolean);
+  for (const [cabeca, abreviacao] of Object.entries(CABECA_ABREVIADA)) {
+    const idx = palavras.indexOf(cabeca);
+    if (idx !== -1) return { abreviacao, resto: palavras.filter((_, i) => i !== idx) };
+  }
+  return null;
+}
+
+// ─── Busca no Hipcom + filtro comum (ativo, não bloqueado, estoque considerando fracionado) ───
+async function buscarEFiltrar(params) {
+  const res = await hipcom.get('/produtos', { params });
+  return (res.data?.produtos || [])
+    .filter(p => p.ativo === 'S'
+      && !HIPCOM_BLOCKED.includes(String(p.plu))
+      && (p.fracionado === 'S' || p.qtd_estoque_atual > 0))
+    .map(p => ({
+      id:    String(p.plu),
+      nome:  p.descricao,
+      preco: p.valor_promocao > 0 ? p.valor_promocao : p.valor_produto,
+      ean:   p.codigo_barra ? String(p.codigo_barra) : null,
+    }));
+}
+
 // ─── A.1 — Busca produtos por nome ou código de barras via Hipcom ───
 async function buscarProduto(termo) {
   const chave = `prod:${termo.trim().toLowerCase()}`;
@@ -110,25 +144,35 @@ async function buscarProduto(termo) {
       const apelidoExato = APELIDOS_PRODUTO[termoLimpo.toLowerCase()];
       termoLimpo = apelidoExato || apelidoFlexivel(termoLimpo) || termoLimpo;
     }
-    // Não usa o filtro somente_estoque_positivo do Hipcom: itens fracionados/produção
-    // (pães, frios, queijos por peso) costumam ficar com estoque negativo por não
-    // reconciliar produção x venda, mas estão sempre disponíveis no dia a dia — o
-    // filtro deles excluiria esses itens mesmo estando em produção contínua.
-    const params = ehCodBarras
-      ? { loja: HIPCOM_LOJA_PRECO, plu: termoLimpo }
-      : { loja: HIPCOM_LOJA_PRECO, descricao: termoLimpo, limite: 8 };
 
-    const res = await hipcom.get('/produtos', { params });
-    const produtos = (res.data?.produtos || [])
-      .filter(p => p.ativo === 'S'
-        && !HIPCOM_BLOCKED.includes(String(p.plu))
-        && (p.fracionado === 'S' || p.qtd_estoque_atual > 0))
-      .map(p => ({
-        id:    String(p.plu),
-        nome:  p.descricao,
-        preco: p.valor_promocao > 0 ? p.valor_promocao : p.valor_produto,
-        ean:   p.codigo_barra ? String(p.codigo_barra) : null,
-      }));
+    let produtos;
+    const cabecaInfo = ehCodBarras ? null : separarCabecaEResto(termoLimpo);
+
+    if (cabecaInfo) {
+      // Busca ampla pela abreviação (traz a categoria inteira: todas as marcas) e filtra
+      // no cliente pelas palavras extras (marca/variação) — não depende de substring contíguo,
+      // já que "REQJ. CREMOSO DANONE" não contém "reqj danone" como trecho único.
+      const todos = await buscarEFiltrar({ loja: HIPCOM_LOJA_PRECO, descricao: cabecaInfo.abreviacao, limite: 50 });
+      if (cabecaInfo.resto.length) {
+        const filtrados = todos.filter(p => {
+          const nomeNorm = removerAcentos(p.nome).toLowerCase();
+          return cabecaInfo.resto.every(palavra => nomeNorm.includes(palavra));
+        });
+        // Sem match da marca/variação pedida: mostra a categoria inteira como alternativa
+        produtos = (filtrados.length ? filtrados : todos).slice(0, 8);
+      } else {
+        produtos = todos.slice(0, 8);
+      }
+    } else {
+      // Não usa o filtro somente_estoque_positivo do Hipcom: itens fracionados/produção
+      // (pães, frios, queijos por peso) costumam ficar com estoque negativo por não
+      // reconciliar produção x venda, mas estão sempre disponíveis no dia a dia — o
+      // filtro deles excluiria esses itens mesmo estando em produção contínua.
+      const params = ehCodBarras
+        ? { loja: HIPCOM_LOJA_PRECO, plu: termoLimpo }
+        : { loja: HIPCOM_LOJA_PRECO, descricao: termoLimpo, limite: 8 };
+      produtos = await buscarEFiltrar(params);
+    }
 
     await cacheSet(chave, produtos, PRODUTOS_TTL);
     return produtos;
