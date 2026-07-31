@@ -196,4 +196,4 @@ function iniciarSyncProdutosPeriodico() {
   logger.info('hipcomProdutosSync: agendado', { intervaloHoras: SYNC_INTERVAL_H });
 }
 
-module.exports = { iniciarSyncProdutosPeriodico, sincronizarProdutos, buscarProdutoLocal, catalogoLocalDisponivel };
+module.exports = { iniciarSyncProdutosPeriodico, sincronizarProdutos, buscarProdutoLocal, catalogoLocalDisponivel, fetchPagina, upsertProdutos };
