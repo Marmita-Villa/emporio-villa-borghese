@@ -144,11 +144,24 @@ const ABREVIACOES_CONHECIDAS = {
 // (ex: "barra de chocolate" — "barra" e "de" não existem na descrição real do produto)
 const PALAVRAS_IGNORAVEIS = new Set(['de', 'do', 'da', 'e', 'a', 'o', 'com', 'para', 'um', 'uma', 'barra', 'barrinha', 'tablete', 'pacote']);
 
+// "Média" é ambígua demais pra virar palavra-chave de OR (aparece como tamanho em vela,
+// escova, azeitona etc.) — precisa de substituição do termo INTEIRO, não palavra a palavra.
+function apelidoTermoInteiro(termoNormalizado) {
+  const t = termoNormalizado.toLowerCase();
+  if (/\bmedia(s)?\b/.test(t)) return 'pao frances'; // "média(s) clarinha(s)"
+  if (/\b(pao|paes)\b/.test(t) && /\bfrances(es)?\b/.test(t)) return 'pao frances';
+  return null;
+}
+
 // ─── Busca produtos no catálogo local (Supabase) — tokenizada, sem depender de ───
 // ─── substring contíguo nem do vocabulário/abreviação exata do Hipcom ───
 async function buscarProdutoLocal(termo, opts = {}) {
   const { limite = 8 } = opts;
-  let palavras = normalizarTexto(termo).split(/\s+/).filter(Boolean)
+  const termoNormalizado = normalizarTexto(termo);
+  // Slangs que só fazem sentido como termo inteiro (ex: "média" é ambígua demais pra
+  // virar palavra-chave solta — aparece em vela, escova, azeitona etc.)
+  const substituicao = apelidoTermoInteiro(termoNormalizado);
+  let palavras = (substituicao || termoNormalizado).split(/\s+/).filter(Boolean)
     .map(p => ABREVIACOES_CONHECIDAS[p] || p);
 
   const palavrasRelevantes = palavras.filter(p => !PALAVRAS_IGNORAVEIS.has(p) && p.length >= 2);
