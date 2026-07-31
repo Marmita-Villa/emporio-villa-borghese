@@ -8,6 +8,7 @@ const { saveSession, salvarConversa } = require('./db');
 const agentesRouter = require('./agentes');
 const webhookEventos = require('./webhookEventos');
 const { iniciarSyncPeriodico } = require('./hipcomSync');
+const { iniciarSyncProdutosPeriodico } = require('./hipcomProdutosSync');
 const { processarMensagem } = require('./atendimento');
 const { getMsg } = require('./config');
 
@@ -335,6 +336,17 @@ app.post('/admin/sync-clientes', async (req, res) => {
   }
 });
 
+// ─── Sync manual do catálogo de produtos Hipcom (debug) ───
+// Roda em background e responde na hora — a sincronização completa pode levar minutos
+// (catálogo grande + Hipcom lento pra consultas grandes). Acompanhe pelos logs do Render
+// ou pelo campo produtos_total no /admin/hipcom-diag.
+app.post('/admin/sync-produtos', async (req, res) => {
+  if (!dashboardKeyValida(req)) return res.status(401).json({ error: 'Não autorizado' });
+  const { sincronizarProdutos } = require('./hipcomProdutosSync');
+  sincronizarProdutos().catch(err => logger.error('Erro no sync manual de produtos', { error: err.message, stack: err.stack }));
+  res.json({ ok: true, mensagem: 'Sync de produtos iniciado em background — acompanhe pelos logs ou pelo diagnóstico' });
+});
+
 // ─── Diagnóstico Hipcom (testa conexão e vars) ───
 app.get('/admin/hipcom-diag', async (req, res) => {
   if (!dashboardKeyValida(req)) return res.status(401).json({ error: 'Não autorizado' });
@@ -351,6 +363,13 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     const sb2 = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
     const { count } = await sb2.from('hipcom_clientes').select('*', { count: 'exact', head: true });
     diag.supabase_clientes = `${count} registros`;
+
+    // Catálogo local de produtos (hipcomProdutosSync) — 0/erro indica que a tabela
+    // ainda não existe ou o sync ainda não rodou
+    try {
+      const { count: countProdutos, error: errProdutos } = await sb2.from('hipcom_produtos').select('*', { count: 'exact', head: true });
+      diag.supabase_produtos = errProdutos ? `ERRO: ${errProdutos.message}` : `${countProdutos} registros`;
+    } catch (e3) { diag.supabase_produtos = `ERRO: ${e3.message}`; }
 
     // Testa busca por CPF informado via ?cpf= (sem PII fixa no código)
     const cpfTeste = String(req.query.cpf || '').replace(/\D/g, '');
@@ -482,4 +501,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   logger.info(`Bot rodando`, { porta: PORT, env: process.env.MOCK_MODE === 'true' ? 'mock' : 'produção' });
   iniciarSyncPeriodico();
+  iniciarSyncProdutosPeriodico();
 });
