@@ -227,10 +227,12 @@ async function catalogoLocalDisponivel() {
   }
 }
 
-// ─── Inicia sync periódico (intervalo configurável, padrão 4h) ───
-// Mais frequente que o de clientes (6h) porque preço/estoque mudam mais rápido —
-// mas o estoque exibido ao cliente sempre é reconfirmado ao vivo antes de fechar o pedido.
-const SYNC_INTERVAL_H  = parseInt(process.env.HIPCOM_PRODUTOS_SYNC_INTERVAL_H || '4', 10);
+// ─── Inicia sync periódico (intervalo configurável, padrão 6h) ───
+// Cada ciclo completo demora alguns minutos (catálogo grande, Hipcom lento) — 6h evita
+// sobrecarregar o servidor. O estoque exibido ao cliente sempre é reconfirmado ao vivo
+// antes de fechar o pedido, então uma tabela de busca com algumas horas de defasagem
+// tem impacto baixo (só no preço/itens exibidos durante a conversa, não no pedido).
+const SYNC_INTERVAL_H  = parseInt(process.env.HIPCOM_PRODUTOS_SYNC_INTERVAL_H || '6', 10);
 const SYNC_INTERVAL_MS = SYNC_INTERVAL_H * 60 * 60 * 1000;
 
 function iniciarSyncProdutosPeriodico() {
