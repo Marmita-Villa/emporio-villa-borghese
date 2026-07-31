@@ -313,7 +313,9 @@ app.post('/chat', async (req, res) => {
     res.json({ resposta: texto });
   } catch (err) {
     logger.error('Erro no chat de teste', { error: err.message });
-    res.status(500).json({ error: err.message });
+    // Nunca expõe o erro cru da API (ex: falta de crédito, chave inválida) na conversa —
+    // mesma mensagem amigável usada no WhatsApp real (whatsapp.js). Detalhe técnico só no log.
+    res.status(500).json({ error: '😅 Tive um probleminha aqui. Pode repetir o que você disse?' });
   }
 });
 
