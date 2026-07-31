@@ -392,6 +392,26 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     diag.produto_hipcom_raw = r.data?.produtos?.[0] || r.data;
   } catch (e) { diag.produto_raw_erro = e.message; }
 
+  // Tamanho total do catálogo ativo (sem filtro de descrição) — mede o escopo real
+  // antes de decidir se vale sincronizar o catálogo inteiro pra busca local
+  if (req.query.catalogo === '1') {
+    const inicio = Date.now();
+    try {
+      const r = await axios.get(`${process.env.HIPCOM_URL}/produtos`, {
+        params: { loja: process.env.HIPCOM_PRICE_STORE || 6, somente_estoque_positivo: 'S', limite: 5000 },
+        auth: { username: process.env.HIPCOM_USER, password: process.env.HIPCOM_PASS },
+        timeout: 30000,
+      });
+      const produtos = r.data?.produtos || [];
+      diag.catalogo_total = produtos.length;
+      diag.catalogo_tempo_ms = Date.now() - inicio;
+      diag.catalogo_atingiu_limite = produtos.length >= 5000;
+    } catch (e) {
+      diag.catalogo_erro = e.message;
+      diag.catalogo_tempo_ms = Date.now() - inicio;
+    }
+  }
+
   // Compara a busca de um termo (?termo=) nas lojas informadas em ?lojas= (padrão 1,6) —
   // ajuda a diagnosticar produtos que só existem cadastrados em determinada loja
   const termoTeste = String(req.query.termo || '').trim();
