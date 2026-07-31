@@ -78,7 +78,16 @@ async function upsertProdutos(produtos) {
     data_ultima_alteracao: p.data_ultima_alteracao || null,
     updated_at:            new Date().toISOString(),
   }));
-  const { error } = await sb.from('hipcom_produtos').upsert(rows, { onConflict: 'plu,loja' });
+
+  // O Hipcom pode retornar o mesmo PLU mais de uma vez na mesma página (ex: registros de
+  // movimentação/entrada) — um único upsert não aceita duas linhas com o mesmo conflito
+  // ("ON CONFLICT DO UPDATE command cannot affect row a second time"). Mantém a última
+  // ocorrência de cada (plu, loja).
+  const porChave = new Map();
+  for (const row of rows) porChave.set(`${row.plu}|${row.loja}`, row);
+  const rowsUnicas = [...porChave.values()];
+
+  const { error } = await sb.from('hipcom_produtos').upsert(rowsUnicas, { onConflict: 'plu,loja' });
   if (error) throw new Error(`Upsert de produtos falhou: ${error.message} | code: ${error.code}`);
 }
 
