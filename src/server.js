@@ -407,12 +407,20 @@ app.get('/admin/hipcom-diag', async (req, res) => {
         });
         const produtos = r.data?.produtos || [];
         diag.busca_por_loja[`loja_${loja}`] = produtos.map(p => ({
-          plu: p.plu, descricao: p.descricao, ativo: p.ativo, estoque: p.qtd_estoque_atual, preco: p.valor_produto,
+          plu: p.plu, descricao: p.descricao, ativo: p.ativo, fracionado: p.fracionado,
+          estoque: p.qtd_estoque_atual, preco: p.valor_produto,
         }));
       } catch (e) {
         diag.busca_por_loja[`loja_${loja}`] = `ERRO: ${e.response?.data ? JSON.stringify(e.response.data) : e.message}`;
       }
     }
+
+    // Chama a função real buscarProduto (com apelido + filtro de fracionado aplicados)
+    // para confirmar ponta a ponta o que o bot de fato retornaria ao cliente
+    try {
+      const { buscarProduto } = require('./sistemaApi');
+      diag.busca_produto_real = await buscarProduto(termoTeste);
+    } catch (e) { diag.busca_produto_real_erro = e.message; }
   }
 
   try {
