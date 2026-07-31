@@ -126,24 +126,41 @@ async function sincronizarProdutos() {
   return total;
 }
 
+// ─── Palavras que o Hipcom abrevia na descrição — mesmo mapeamento usado na busca ao
+// vivo (sistemaApi.js). Sem isso, "chocolate lindt" nunca acharia "CHOC. LINDT..." porque
+// a palavra "chocolate" nunca aparece por extenso no catálogo.
+const ABREVIACOES_CONHECIDAS = {
+  requeijao: 'reqj', requeijoes: 'reqj',
+  queijo: 'qj', queijos: 'qj',
+  chocolate: 'choc', chocolates: 'choc',
+};
+
+// Conectores/palavras de contexto que raramente aparecem na descrição curta do Hipcom
+// (ex: "barra de chocolate" — "barra" e "de" não existem na descrição real do produto)
+const PALAVRAS_IGNORAVEIS = new Set(['de', 'do', 'da', 'e', 'a', 'o', 'com', 'para', 'um', 'uma', 'barra', 'barrinha', 'tablete', 'pacote']);
+
 // ─── Busca produtos no catálogo local (Supabase) — tokenizada, sem depender de ───
 // ─── substring contíguo nem do vocabulário/abreviação exata do Hipcom ───
 async function buscarProdutoLocal(termo, opts = {}) {
   const { limite = 8 } = opts;
-  const palavras = normalizarTexto(termo).split(/\s+/).filter(Boolean);
-  if (!palavras.length) return [];
+  let palavras = normalizarTexto(termo).split(/\s+/).filter(Boolean)
+    .map(p => ABREVIACOES_CONHECIDAS[p] || p);
 
-  // Busca candidatos pela palavra mais "rara" (mais longa) primeiro — reduz o resultado
-  // bruto antes de pontuar no cliente. Palavras curtas (≤2 letras) tendem a ser ruído.
-  const palavraPrincipal = [...palavras].sort((a, b) => b.length - a.length)[0];
+  const palavrasRelevantes = palavras.filter(p => !PALAVRAS_IGNORAVEIS.has(p) && p.length >= 2);
+  if (!palavrasRelevantes.length) palavrasRelevantes.push(...palavras);
+  if (!palavrasRelevantes.length) return [];
 
+  // Busca candidatos que batem em QUALQUER uma das palavras (OR) — não só a "mais longa".
+  // Escolher uma única palavra "principal" falha sempre que ela não existe no vocabulário
+  // abreviado do Hipcom mas outra (ex: marca) existe — foi exatamente o bug encontrado.
+  const orFiltro = palavrasRelevantes.map(p => `descricao_normalizada.ilike.%${p}%`).join(',');
   const { data, error } = await sb
     .from('hipcom_produtos')
     .select('plu,descricao,descricao_normalizada,preco,preco_promocao,estoque,fracionado,ativo,ean,departamento')
     .eq('loja', HIPCOM_LOJA)
     .eq('ativo', 'S')
-    .ilike('descricao_normalizada', `%${palavraPrincipal}%`)
-    .limit(300);
+    .or(orFiltro)
+    .limit(500);
 
   if (error) {
     logger.error('hipcomProdutosSync: erro na busca local', { termo, error: error.message });
@@ -151,12 +168,13 @@ async function buscarProdutoLocal(termo, opts = {}) {
   }
 
   // Pontua por quantas palavras do termo aparecem na descrição — não exige que todas
-  // batam (algumas podem ser ruído: "barra", "de", marca incomum etc.)
+  // batam (algumas podem ser ruído: "barra", "de", marca incomum etc.). Itens que batem
+  // em mais palavras (ex: marca + tipo) ficam no topo.
   const pontuados = (data || [])
     .filter(p => p.fracionado === 'S' || p.estoque > 0) // mesmo critério de disponibilidade do buscarProduto
     .map(p => ({
       produto: p,
-      matches: palavras.filter(palavra => p.descricao_normalizada.includes(palavra)).length,
+      matches: palavrasRelevantes.filter(palavra => p.descricao_normalizada.includes(palavra)).length,
     }))
     .filter(x => x.matches > 0)
     .sort((a, b) => b.matches - a.matches);
