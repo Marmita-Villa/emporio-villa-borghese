@@ -392,6 +392,29 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     diag.produto_hipcom_raw = r.data?.produtos?.[0] || r.data;
   } catch (e) { diag.produto_raw_erro = e.message; }
 
+  // Compara a busca de um termo (?termo=) nas lojas informadas em ?lojas= (padrão 1,6) —
+  // ajuda a diagnosticar produtos que só existem cadastrados em determinada loja
+  const termoTeste = String(req.query.termo || '').trim();
+  if (termoTeste) {
+    const lojas = String(req.query.lojas || '1,6').split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
+    diag.busca_por_loja = {};
+    for (const loja of lojas) {
+      try {
+        const r = await axios.get(`${process.env.HIPCOM_URL}/produtos`, {
+          params: { loja, descricao: termoTeste, limite: 10 },
+          auth: { username: process.env.HIPCOM_USER, password: process.env.HIPCOM_PASS },
+          timeout: 10000,
+        });
+        const produtos = r.data?.produtos || [];
+        diag.busca_por_loja[`loja_${loja}`] = produtos.map(p => ({
+          plu: p.plu, descricao: p.descricao, ativo: p.ativo, estoque: p.qtd_estoque_atual, preco: p.valor_produto,
+        }));
+      } catch (e) {
+        diag.busca_por_loja[`loja_${loja}`] = `ERRO: ${e.response?.data ? JSON.stringify(e.response.data) : e.message}`;
+      }
+    }
+  }
+
   try {
     const r = await axios.get(`${process.env.HIPCOM_URL}/clientes`, {
       params: { loja: process.env.HIPCOM_CLIENT_STORE || 1, limite: 1 },
