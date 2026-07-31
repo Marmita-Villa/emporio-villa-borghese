@@ -52,8 +52,13 @@ async function salvarUltimaSync(ts) {
 
 // ─── Busca uma página de produtos no Hipcom ───
 async function fetchPagina(offset) {
+  // NÃO usa somente_estoque_positivo: itens fracionados/produção (pães, frios, queijos por
+  // peso) ficam com estoque negativo por não reconciliar produção x venda, mas estão sempre
+  // disponíveis (ex: PAO FRANCES * KG com estoque -5350) — esse filtro os excluiria da
+  // sincronização inteira. O filtro de disponibilidade real é aplicado na busca
+  // (buscarProdutoLocal), que já considera fracionado='S' como sempre disponível.
   const res = await hipcom.get('/produtos', {
-    params: { loja: HIPCOM_LOJA, somente_estoque_positivo: 'S', limite: BATCH, offset },
+    params: { loja: HIPCOM_LOJA, limite: BATCH, offset },
   });
   return res.data?.produtos || [];
 }
