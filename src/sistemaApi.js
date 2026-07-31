@@ -75,6 +75,7 @@ function pareceCodBarras(termo) {
 
 // ─── Apelidos de busca: nome que o cliente usa → termo que existe na descrição do Hipcom ───
 // Chaves já sem acento e minúsculas (comparação feita após removerAcentos). Adicione livremente.
+// Match EXATO — o termo inteiro precisa ser igual à chave (ex: cliente digitou só "pao").
 const APELIDOS_PRODUTO = {
   'pao':          'pao frances',
   'pãozinho':     'pao frances', // fica aqui por clareza; removerAcentos ja normaliza antes da comparação
@@ -82,6 +83,17 @@ const APELIDOS_PRODUTO = {
   'media':        'pao frances',
   'pao de sal':   'pao frances',
 };
+
+// ─── Apelidos flexíveis: casam mesmo com plural/variações extras (ex: "médias clarinhas",
+// "pão francês claro") que o match exato acima não pega. O Hipcom busca por substring exata,
+// então qualquer palavra extra ("claro", "clarinho") quebraria a busca — aqui normalizamos
+// para o termo real do catálogo, descartando o resto.
+function apelidoFlexivel(termoNormalizado) {
+  const t = termoNormalizado.toLowerCase();
+  if (/\bmedia(s)?\b/.test(t)) return 'pao frances'; // "média(s)", "médias clarinhas"
+  if (/\b(pao|paes)\b/.test(t) && /\bfrances(es)?\b/.test(t)) return 'pao frances'; // "pão(ães) francês(es) + qualquer coisa"
+  return null;
+}
 
 // ─── A.1 — Busca produtos por nome ou código de barras via Hipcom ───
 async function buscarProduto(termo) {
@@ -93,18 +105,24 @@ async function buscarProduto(termo) {
     const ehCodBarras = pareceCodBarras(termoOriginal);
     // O Hipcom não trata acentos ("pão francês" não bate com "PAO FRANCES * KG") — remove antes de buscar
     let termoLimpo = ehCodBarras ? termoOriginal : removerAcentos(termoOriginal);
-    // Aplica apelido se o termo (normalizado) bater exatamente com um apelido cadastrado
+    // Aplica apelido: primeiro tenta match exato, depois o flexível (cobre plural/variações)
     if (!ehCodBarras) {
-      const apelido = APELIDOS_PRODUTO[termoLimpo.toLowerCase()];
-      if (apelido) termoLimpo = apelido;
+      const apelidoExato = APELIDOS_PRODUTO[termoLimpo.toLowerCase()];
+      termoLimpo = apelidoExato || apelidoFlexivel(termoLimpo) || termoLimpo;
     }
+    // Não usa o filtro somente_estoque_positivo do Hipcom: itens fracionados/produção
+    // (pães, frios, queijos por peso) costumam ficar com estoque negativo por não
+    // reconciliar produção x venda, mas estão sempre disponíveis no dia a dia — o
+    // filtro deles excluiria esses itens mesmo estando em produção contínua.
     const params = ehCodBarras
-      ? { loja: HIPCOM_LOJA_PRECO, plu: termoLimpo, somente_estoque_positivo: 'S' }
-      : { loja: HIPCOM_LOJA_PRECO, descricao: termoLimpo, somente_estoque_positivo: 'S', limite: 8 };
+      ? { loja: HIPCOM_LOJA_PRECO, plu: termoLimpo }
+      : { loja: HIPCOM_LOJA_PRECO, descricao: termoLimpo, limite: 8 };
 
     const res = await hipcom.get('/produtos', { params });
     const produtos = (res.data?.produtos || [])
-      .filter(p => p.ativo === 'S' && !HIPCOM_BLOCKED.includes(String(p.plu)))
+      .filter(p => p.ativo === 'S'
+        && !HIPCOM_BLOCKED.includes(String(p.plu))
+        && (p.fracionado === 'S' || p.qtd_estoque_atual > 0))
       .map(p => ({
         id:    String(p.plu),
         nome:  p.descricao,
@@ -187,7 +205,9 @@ async function verificarEstoque(produtoId) {
     const produto = res.data?.produtos?.[0];
     if (!produto) return { disponivel: true, quantidade: -1 };
     const quantidade = produto.qtd_estoque_atual || 0;
-    const result = { disponivel: quantidade > 0, quantidade };
+    // Itens fracionados/produção (pães, frios, queijos por peso) ficam com estoque
+    // negativo por não reconciliar produção x venda — tratamos como sempre disponíveis
+    const result = { disponivel: produto.fracionado === 'S' || quantidade > 0, quantidade };
     await cacheSet(chave, result);
     return result;
   } catch (err) {
