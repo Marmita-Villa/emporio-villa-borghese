@@ -156,15 +156,19 @@ async function buscarProduto(termo) {
       // itens do que parece (inclui combos/produção com PLU alto, ex: cheddar 1,8kg), um
       // limite baixo cortava variações reais do catálogo antes do filtro por marca rodar.
       const todos = await buscarEFiltrar({ loja: HIPCOM_LOJA_PRECO, descricao: cabecaInfo.abreviacao, limite: 500 });
+      // Corte final maior que a busca comum (8): o cliente está navegando a categoria
+      // inteira (ex: "quais requeijões vocês têm?"), com dezenas de marcas reais em estoque
+      // (comprovado: só requeijão tem 40+ variantes cadastradas) — 8 esconderia quase tudo.
+      const LIMITE_CATEGORIA = 25;
       if (cabecaInfo.resto.length) {
         const filtrados = todos.filter(p => {
           const nomeNorm = removerAcentos(p.nome).toLowerCase();
           return cabecaInfo.resto.every(palavra => nomeNorm.includes(palavra));
         });
         // Sem match da marca/variação pedida: mostra a categoria inteira como alternativa
-        produtos = (filtrados.length ? filtrados : todos).slice(0, 8);
+        produtos = (filtrados.length ? filtrados : todos).slice(0, LIMITE_CATEGORIA);
       } else {
-        produtos = todos.slice(0, 8);
+        produtos = todos.slice(0, LIMITE_CATEGORIA);
       }
     } else {
       // Não usa o filtro somente_estoque_positivo do Hipcom: itens fracionados/produção
