@@ -152,7 +152,10 @@ async function buscarProduto(termo) {
       // Busca ampla pela abreviação (traz a categoria inteira: todas as marcas) e filtra
       // no cliente pelas palavras extras (marca/variação) — não depende de substring contíguo,
       // já que "REQJ. CREMOSO DANONE" não contém "reqj danone" como trecho único.
-      const todos = await buscarEFiltrar({ loja: HIPCOM_LOJA_PRECO, descricao: cabecaInfo.abreviacao, limite: 50 });
+      // Limite alto (mesmo usado em getOfertas): categorias como "REQJ." têm muito mais
+      // itens do que parece (inclui combos/produção com PLU alto, ex: cheddar 1,8kg), um
+      // limite baixo cortava variações reais do catálogo antes do filtro por marca rodar.
+      const todos = await buscarEFiltrar({ loja: HIPCOM_LOJA_PRECO, descricao: cabecaInfo.abreviacao, limite: 500 });
       if (cabecaInfo.resto.length) {
         const filtrados = todos.filter(p => {
           const nomeNorm = removerAcentos(p.nome).toLowerCase();
