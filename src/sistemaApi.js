@@ -174,7 +174,10 @@ async function buscarProduto(termo) {
       produtos = await buscarEFiltrar(params);
     }
 
-    await cacheSet(chave, produtos, PRODUTOS_TTL);
+    // Não cacheia resultado vazio: um timeout/falha momentânea do Hipcom retornaria []
+    // e ficaria "grudado" por 15 min, fazendo o produto parecer inexistente pra qualquer
+    // cliente que perguntar o mesmo termo nesse meio tempo.
+    if (produtos.length) await cacheSet(chave, produtos, PRODUTOS_TTL);
     return produtos;
   } catch (err) {
     logger.error('Erro ao buscar produto no Hipcom', { termo, error: err.message });
