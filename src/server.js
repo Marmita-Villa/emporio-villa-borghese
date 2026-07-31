@@ -369,6 +369,9 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     try {
       const { count: countProdutos, error: errProdutos } = await sb2.from('hipcom_produtos').select('*', { count: 'exact', head: true });
       diag.supabase_produtos = errProdutos ? `ERRO: ${errProdutos.message}` : `${countProdutos} registros`;
+      if (errProdutos) {
+        diag.supabase_produtos_detalhe = { code: errProdutos.code, details: errProdutos.details, hint: errProdutos.hint };
+      }
     } catch (e3) { diag.supabase_produtos = `ERRO: ${e3.message}`; }
 
     // Testa busca por CPF informado via ?cpf= (sem PII fixa no código)
