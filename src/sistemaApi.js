@@ -142,7 +142,11 @@ async function buscarEFiltrar(params) {
     }));
 }
 
-// ─── A.1 — Busca produtos por nome ou código de barras via Hipcom ───
+// ─── A.1 — Busca produtos por nome ou código de barras ───
+// Prioriza o catálogo local sincronizado (hipcomProdutosSync) — rápido e sem depender das
+// abreviações/vocabulário exato do Hipcom (REQJ., QJ., CHOC. etc.). Enquanto o catálogo
+// local ainda não foi sincronizado (ex: logo após o primeiro deploy), cai para a busca
+// ao vivo no Hipcom (buscarProdutoLegado) como rede de segurança.
 async function buscarProduto(termo) {
   const chave = `prod:${termo.trim().toLowerCase()}`;
   const cached = await cacheGet(chave);
@@ -150,68 +154,71 @@ async function buscarProduto(termo) {
   try {
     const termoOriginal = termo.trim();
     const ehCodBarras = pareceCodBarras(termoOriginal);
-    // O Hipcom não trata acentos ("pão francês" não bate com "PAO FRANCES * KG") — remove antes de buscar
-    let termoLimpo = ehCodBarras ? termoOriginal : removerAcentos(termoOriginal);
-    // Aplica apelido: primeiro tenta match exato, depois o flexível (cobre plural/variações)
-    if (!ehCodBarras) {
-      const apelidoExato = APELIDOS_PRODUTO[termoLimpo.toLowerCase()];
-      termoLimpo = apelidoExato || apelidoFlexivel(termoLimpo) || termoLimpo;
-    }
 
     let produtos;
-    const cabecaInfo = ehCodBarras ? null : separarCabecaEResto(termoLimpo);
-
-    if (cabecaInfo) {
-      // Busca ampla pela abreviação (traz a categoria inteira: todas as marcas) e filtra
-      // no cliente pelas palavras extras (marca/variação) — não depende de substring contíguo,
-      // já que "REQJ. CREMOSO DANONE" não contém "reqj danone" como trecho único.
-      // Limite alto (mesmo usado em getOfertas): categorias como "REQJ." têm muito mais
-      // itens do que parece (inclui combos/produção com PLU alto, ex: cheddar 1,8kg), um
-      // limite baixo cortava variações reais do catálogo antes do filtro por marca rodar.
-      const todos = await buscarEFiltrar({ loja: HIPCOM_LOJA_PRECO, descricao: cabecaInfo.abreviacao, limite: 500 });
-      // Corte final maior que a busca comum (8): o cliente está navegando a categoria
-      // inteira (ex: "quais requeijões vocês têm?"), com dezenas de marcas reais em estoque
-      // (comprovado: só requeijão tem 40+ variantes cadastradas) — 8 esconderia quase tudo.
-      const LIMITE_CATEGORIA = 25;
-      if (cabecaInfo.resto.length) {
-        // Basta bater com AO MENOS UMA palavra extra (não todas) — algumas palavras que o
-        // cliente/IA usa (ex: "assorted", termos de variação incomuns) podem não aparecer
-        // literalmente na descrição; exigir 100% derrubava marcas que deveriam aparecer.
-        // Ordena pelos que batem em mais palavras primeiro (mais relevantes no topo).
-        const pontuados = todos
-          .map(p => {
-            const nomeNorm = removerAcentos(p.nome).toLowerCase();
-            const matches = cabecaInfo.resto.filter(palavra => nomeNorm.includes(palavra)).length;
-            return { produto: p, matches };
-          })
-          .filter(x => x.matches > 0)
-          .sort((a, b) => b.matches - a.matches);
-        const filtrados = pontuados.map(x => x.produto);
-        // Sem match da marca/variação pedida: mostra a categoria inteira como alternativa
-        produtos = (filtrados.length ? filtrados : todos).slice(0, LIMITE_CATEGORIA);
-      } else {
-        produtos = todos.slice(0, LIMITE_CATEGORIA);
-      }
+    if (ehCodBarras) {
+      // Código de barras/PLU: item único e exato, sempre consulta ao vivo
+      produtos = await buscarEFiltrar({ loja: HIPCOM_LOJA_PRECO, plu: termoOriginal });
     } else {
-      // Não usa o filtro somente_estoque_positivo do Hipcom: itens fracionados/produção
-      // (pães, frios, queijos por peso) costumam ficar com estoque negativo por não
-      // reconciliar produção x venda, mas estão sempre disponíveis no dia a dia — o
-      // filtro deles excluiria esses itens mesmo estando em produção contínua.
-      const params = ehCodBarras
-        ? { loja: HIPCOM_LOJA_PRECO, plu: termoLimpo }
-        : { loja: HIPCOM_LOJA_PRECO, descricao: termoLimpo, limite: 8 };
-      produtos = await buscarEFiltrar(params);
+      const { buscarProdutoLocal, catalogoLocalDisponivel } = require('./hipcomProdutosSync');
+      if (await catalogoLocalDisponivel()) {
+        produtos = await buscarProdutoLocal(termoOriginal, { limite: 8 });
+      } else {
+        produtos = await buscarProdutoLegado(termoOriginal);
+      }
     }
 
-    // Não cacheia resultado vazio: um timeout/falha momentânea do Hipcom retornaria []
-    // e ficaria "grudado" por 15 min, fazendo o produto parecer inexistente pra qualquer
-    // cliente que perguntar o mesmo termo nesse meio tempo.
+    // Não cacheia resultado vazio: um timeout/falha momentânea retornaria [] e ficaria
+    // "grudado" por 15 min, fazendo o produto parecer inexistente pra qualquer cliente
+    // que perguntar o mesmo termo nesse meio tempo.
     if (produtos.length) await cacheSet(chave, produtos, PRODUTOS_TTL);
     return produtos;
   } catch (err) {
-    logger.error('Erro ao buscar produto no Hipcom', { termo, error: err.message });
+    logger.error('Erro ao buscar produto', { termo, error: err.message });
     return [];
   }
+}
+
+// ─── Busca ao vivo no Hipcom (rede de segurança enquanto o catálogo local não sincronizou) ───
+// Mantém o mecanismo de apelidos/categoria abreviada que já corrigimos manualmente
+// (pão francês, requeijão/queijo, chocolate) para essa janela de transição.
+async function buscarProdutoLegado(termoOriginal) {
+  // O Hipcom não trata acentos ("pão francês" não bate com "PAO FRANCES * KG") — remove antes de buscar
+  let termoLimpo = removerAcentos(termoOriginal);
+  // Aplica apelido: primeiro tenta match exato, depois o flexível (cobre plural/variações)
+  const apelidoExato = APELIDOS_PRODUTO[termoLimpo.toLowerCase()];
+  termoLimpo = apelidoExato || apelidoFlexivel(termoLimpo) || termoLimpo;
+
+  const cabecaInfo = separarCabecaEResto(termoLimpo);
+  // Corte final maior que a busca comum (8) quando é navegação de categoria inteira
+  const LIMITE_CATEGORIA = 25;
+
+  if (cabecaInfo) {
+    // Busca ampla pela abreviação (traz a categoria inteira: todas as marcas) e filtra
+    // no cliente pelas palavras extras (marca/variação) — não depende de substring contíguo.
+    const todos = await buscarEFiltrar({ loja: HIPCOM_LOJA_PRECO, descricao: cabecaInfo.abreviacao, limite: 500 });
+    if (cabecaInfo.resto.length) {
+      // Basta bater com AO MENOS UMA palavra extra (não todas), ordenado pelos que batem
+      // em mais palavras primeiro.
+      const pontuados = todos
+        .map(p => {
+          const nomeNorm = removerAcentos(p.nome).toLowerCase();
+          const matches = cabecaInfo.resto.filter(palavra => nomeNorm.includes(palavra)).length;
+          return { produto: p, matches };
+        })
+        .filter(x => x.matches > 0)
+        .sort((a, b) => b.matches - a.matches);
+      const filtrados = pontuados.map(x => x.produto);
+      // Sem match da marca/variação pedida: mostra a categoria inteira como alternativa
+      return (filtrados.length ? filtrados : todos).slice(0, LIMITE_CATEGORIA);
+    }
+    return todos.slice(0, LIMITE_CATEGORIA);
+  }
+
+  // Não usa o filtro somente_estoque_positivo do Hipcom: itens fracionados/produção
+  // (pães, frios, queijos por peso) costumam ficar com estoque negativo por não
+  // reconciliar produção x venda, mas estão sempre disponíveis no dia a dia.
+  return await buscarEFiltrar({ loja: HIPCOM_LOJA_PRECO, descricao: termoLimpo, limite: 8 });
 }
 
 // ─── A.1 — Alias para listagem geral ───
