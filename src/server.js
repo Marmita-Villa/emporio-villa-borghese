@@ -389,6 +389,28 @@ app.get('/admin/hipcom-diag', async (req, res) => {
       } catch (e4) { diag.teste_escrita = { erro: e4.message }; }
     }
 
+    // Testa UMA página real do sync (fetch + upsert) de forma síncrona, isolando
+    // exatamente onde o pipeline falha (busca no Hipcom ou upsert com dados reais)
+    if (req.query.testarsync === '1') {
+      try {
+        const { fetchPagina, upsertProdutos } = require('./hipcomProdutosSync');
+        const t0 = Date.now();
+        const itens = await fetchPagina(0);
+        diag.teste_sync_fetch = { qtd: itens.length, ms: Date.now() - t0, exemplo: itens[0] || null };
+        if (itens.length) {
+          const t1 = Date.now();
+          try {
+            await upsertProdutos(itens);
+            diag.teste_sync_upsert = { ok: true, ms: Date.now() - t1 };
+          } catch (eUp) {
+            diag.teste_sync_upsert = { ok: false, erro: eUp.message };
+          }
+        }
+      } catch (e5) {
+        diag.teste_sync_fetch = { erro: e5.message, stack: e5.stack?.split('\n').slice(0, 3) };
+      }
+    }
+
     // Testa busca por CPF informado via ?cpf= (sem PII fixa no código)
     const cpfTeste = String(req.query.cpf || '').replace(/\D/g, '');
     if (cpfTeste) {
