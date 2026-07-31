@@ -374,6 +374,21 @@ app.get('/admin/hipcom-diag', async (req, res) => {
       }
     } catch (e3) { diag.supabase_produtos = `ERRO: ${e3.message}`; }
 
+    // Testa o caminho de ESCRITA diretamente (isola se é RLS bloqueando o INSERT do sync)
+    if (req.query.testarescrita === '1') {
+      try {
+        const { error: errInsert } = await sb2.from('hipcom_produtos').upsert(
+          { plu: -1, loja: -1, descricao: 'TESTE_DIAGNOSTICO', descricao_normalizada: 'teste_diagnostico' },
+          { onConflict: 'plu,loja' }
+        );
+        diag.teste_escrita = errInsert
+          ? { erro: errInsert.message, code: errInsert.code, details: errInsert.details, hint: errInsert.hint }
+          : 'OK — upsert de teste funcionou';
+        // Limpa a linha de teste
+        if (!errInsert) await sb2.from('hipcom_produtos').delete().eq('plu', -1).eq('loja', -1);
+      } catch (e4) { diag.teste_escrita = { erro: e4.message }; }
+    }
+
     // Testa busca por CPF informado via ?cpf= (sem PII fixa no código)
     const cpfTeste = String(req.query.cpf || '').replace(/\D/g, '');
     if (cpfTeste) {
