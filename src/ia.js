@@ -194,6 +194,15 @@ Total de pedidos: ${vezes} | Perfil: ${perfil}`;
     }
 
     const produtos = await buscarProduto(inputs.termo);
+
+    // DEBUG temporário: registra o último termo buscado + qtd de resultados, para
+    // inspecionar via diagnóstico o que a IA de fato está enviando pra buscar_produtos
+    try {
+      const { Redis } = require('@upstash/redis');
+      const _dbgRedis = new Redis({ url: process.env.UPSTASH_REDIS_URL, token: process.env.UPSTASH_REDIS_TOKEN });
+      await _dbgRedis.set('debug:ultima_busca_produtos', { termo: inputs.termo, qtd: produtos.length, ts: Date.now() }, { ex: 900 });
+    } catch (_) {}
+
     if (!produtos.length) return `Não encontrei produtos com o termo "${inputs.termo}".`;
 
     const lista = produtos.slice(0, 8).map(p =>

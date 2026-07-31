@@ -358,6 +358,13 @@ app.get('/admin/hipcom-diag', async (req, res) => {
     HIPCOM_SENHA: process.env.HIPCOM_SENHA ? '(definido)' : '(não definido)',
     HIPCOM_CLIENT_STORE: process.env.HIPCOM_CLIENT_STORE || '(não definido)',
   };
+  // DEBUG temporário: mostra o último termo que a IA realmente enviou pra buscar_produtos
+  try {
+    const { Redis } = require('@upstash/redis');
+    const dbgRedis = new Redis({ url: process.env.UPSTASH_REDIS_URL, token: process.env.UPSTASH_REDIS_TOKEN });
+    diag.debug_ultima_busca_ia = await dbgRedis.get('debug:ultima_busca_produtos');
+  } catch (e) { diag.debug_ultima_busca_ia = { erro: e.message }; }
+
   try {
     const { createClient } = require('@supabase/supabase-js');
     const sb2 = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
